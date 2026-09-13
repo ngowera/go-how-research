@@ -1,0 +1,36 @@
+# Flutter & Dart gitignore
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.wav
+*.mp3
+*.m4a
+*.sav
+*.xlsx
+*.csv
+*.pem
+*.key
+coverage/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Windows
+windows/flutter/ephemeral/
+
+# Linux
+linux/flutter/ephemeral/
