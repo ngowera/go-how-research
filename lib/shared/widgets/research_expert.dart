@@ -6,18 +6,47 @@ import '../../core/providers/auth_provider.dart';
 
 class ResearchExpertButton extends StatelessWidget {
   const ResearchExpertButton({super.key});
+
+  void _openPanel(BuildContext context) {
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close AI panel',
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return const Align(
+          alignment: Alignment.centerRight,
+          child: ResearchExpertDialog(),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: FadeTransition(opacity: curved, child: child),
+        );
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => FloatingActionButton.large(
+  Widget build(BuildContext context) => FloatingActionButton(
         heroTag: 'research-expert',
-        tooltip: 'Ask Research Expert',
+        tooltip: 'Open AI research expert',
         shape: const CircleBorder(),
-        onPressed: () => showDialog(
-            context: context, builder: (_) => const ResearchExpertDialog()),
-        child: const Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.psychology_outlined),
-          Text('Research\nExpert',
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 11))
-        ]),
+        onPressed: () => _openPanel(context),
+        child: const Text(
+          'AI',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
       );
 }
 
@@ -95,20 +124,56 @@ class _ResearchExpertDialogState extends ConsumerState<ResearchExpertDialog> {
         .projects
         .where((p) => p.ownerId == uid)
         .toList();
-    return Dialog(
-        child: SizedBox(
-            width: 600,
-            height: MediaQuery.sizeOf(context).height * .82,
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final panelWidth = screenWidth < 560 ? screenWidth : 460.0;
+    final isCompact = screenWidth < 560;
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 18,
+      borderRadius: isCompact
+          ? BorderRadius.zero
+          : const BorderRadius.horizontal(left: Radius.circular(22)),
+      clipBehavior: Clip.antiAlias,
+      child: SafeArea(
+        left: false,
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 160),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SizedBox(
+            width: panelWidth,
+            height: double.infinity,
             child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
                 child: Column(children: [
                   Row(children: [
-                    const Icon(Icons.psychology),
-                    const SizedBox(width: 8),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text('AI',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                    const SizedBox(width: 10),
                     const Expanded(
-                        child: Text('Research Expert',
-                            style: TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Research Expert',
+                              style: TextStyle(
+                                  fontSize: 19, fontWeight: FontWeight.bold)),
+                          Text('Ask about your projects and synced findings',
+                              style: TextStyle(fontSize: 11)),
+                        ],
+                      ),
+                    ),
                     IconButton(
                         tooltip: 'Close',
                         onPressed: () => Navigator.pop(context),
@@ -205,6 +270,10 @@ class _ResearchExpertDialogState extends ConsumerState<ResearchExpertDialog> {
                         onPressed: busy ? null : send,
                         icon: const Icon(Icons.send))
                   ]),
-                ]))));
+                ])),
+          ),
+        ),
+      ),
+    );
   }
 }
