@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/providers/analytics_provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/models/app_models.dart';
 import '../../../core/providers/projects_provider.dart';
-import '../../../core/providers/questionnaire_provider.dart';
 import '../../../core/utils/export_utils.dart';
 import '../../../shared/theme/app_theme.dart';
 
@@ -31,6 +32,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             (p) => p.id == _selectedProjectId,
             orElse: () => projects.first,
           );
+    final currentUser = ref.watch(currentUserProvider);
+    final canExport = currentProj != null &&
+        (currentProj.ownerId == currentUser?.id ||
+            const {
+              UserRole.admin,
+              UserRole.supervisor,
+            }.contains(currentUser?.role));
 
     final analyticsState = _selectedProjectId != null
         ? ref.watch(analyticsProvider(_selectedProjectId!))
@@ -83,7 +91,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       ),
                       const SizedBox(width: 14),
                       ElevatedButton.icon(
-                        onPressed: currentProj == null
+                        onPressed: !canExport
                             ? null
                             : () async {
                                 try {

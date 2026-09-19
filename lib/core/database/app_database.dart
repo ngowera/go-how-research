@@ -143,6 +143,15 @@ class InterviewDrafts extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class ProjectMembers extends Table {
+  TextColumn get projectId => text()();
+  TextColumn get userId => text()();
+  TextColumn get projectRole => text()();
+
+  @override
+  Set<Column> get primaryKey => {projectId, userId};
+}
+
 // ---------------------------------------------------------------------------
 // Database
 // ---------------------------------------------------------------------------
@@ -157,6 +166,7 @@ class InterviewDrafts extends Table {
     Participants,
     SyncDeletions,
     InterviewDrafts,
+    ProjectMembers,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -164,7 +174,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? connection.openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -174,6 +184,7 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.createTable(syncDeletions);
           if (from < 3) await m.createTable(interviewDrafts);
+          if (from < 4) await m.createTable(projectMembers);
         },
       );
 
@@ -238,14 +249,44 @@ class AppDatabase extends _$AppDatabase {
   Future<List<m.ResearchProject>> getProjects({String? ownerId}) async {
     final query = select(projects);
     final user = await getCurrentUser();
-    if (user != null)
-      query.where(
-          (p) => p.ownerId.equals(user.id) | p.supervisorId.equals(user.id));
+    if (user != null) {
+      final memberships = await (select(projectMembers)
+            ..where((member) => member.userId.equals(user.id)))
+          .get();
+      final sharedIds = memberships.map((member) => member.projectId).toList();
+      query.where((p) => p.ownerId.equals(user.id) |
+          p.supervisorId.equals(user.id) |
+          (sharedIds.isNotEmpty ? p.id.isIn(sharedIds) : const Constant(false)));
+    }
     if (ownerId != null) {
       query.where((p) => p.ownerId.equals(ownerId));
     }
     final rows = await query.get();
     return rows.map(_projectFromRow).toList();
+  }
+
+  Future<void> upsertProjectMembership({
+    required String projectId,
+    required String userId,
+    required String projectRole,
+  }) async {
+    await into(projectMembers).insertOnConflictUpdate(
+          ProjectMembersCompanion.insert(
+            projectId: projectId,
+            userId: userId,
+            projectRole: projectRole,
+          ),
+        );
+  }
+
+  Future<String?> getProjectMembershipRole(String projectId) async {
+    final user = await getCurrentUser();
+    if (user == null) return null;
+    final row = await (select(projectMembers)
+          ..where((member) => member.projectId.equals(projectId))
+          ..where((member) => member.userId.equals(user.id)))
+        .getSingleOrNull();
+    return row?.projectRole;
   }
 
   Future<m.ResearchProject?> getProjectById(String id) async {

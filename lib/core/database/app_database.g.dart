@@ -3978,6 +3978,242 @@ class InterviewDraftsCompanion extends UpdateCompanion<InterviewDraft> {
   }
 }
 
+class $ProjectMembersTable extends ProjectMembers
+    with TableInfo<$ProjectMembersTable, ProjectMember> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProjectMembersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _projectIdMeta =
+      const VerificationMeta('projectId');
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+      'project_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _projectRoleMeta =
+      const VerificationMeta('projectRole');
+  @override
+  late final GeneratedColumn<String> projectRole = GeneratedColumn<String>(
+      'project_role', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [projectId, userId, projectRole];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'project_members';
+  @override
+  VerificationContext validateIntegrity(Insertable<ProjectMember> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('project_id')) {
+      context.handle(_projectIdMeta,
+          projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta));
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('project_role')) {
+      context.handle(
+          _projectRoleMeta,
+          projectRole.isAcceptableOrUnknown(
+              data['project_role']!, _projectRoleMeta));
+    } else if (isInserting) {
+      context.missing(_projectRoleMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {projectId, userId};
+  @override
+  ProjectMember map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProjectMember(
+      projectId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}project_id'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id'])!,
+      projectRole: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}project_role'])!,
+    );
+  }
+
+  @override
+  $ProjectMembersTable createAlias(String alias) {
+    return $ProjectMembersTable(attachedDatabase, alias);
+  }
+}
+
+class ProjectMember extends DataClass implements Insertable<ProjectMember> {
+  final String projectId;
+  final String userId;
+  final String projectRole;
+  const ProjectMember(
+      {required this.projectId,
+      required this.userId,
+      required this.projectRole});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['project_id'] = Variable<String>(projectId);
+    map['user_id'] = Variable<String>(userId);
+    map['project_role'] = Variable<String>(projectRole);
+    return map;
+  }
+
+  ProjectMembersCompanion toCompanion(bool nullToAbsent) {
+    return ProjectMembersCompanion(
+      projectId: Value(projectId),
+      userId: Value(userId),
+      projectRole: Value(projectRole),
+    );
+  }
+
+  factory ProjectMember.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProjectMember(
+      projectId: serializer.fromJson<String>(json['projectId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      projectRole: serializer.fromJson<String>(json['projectRole']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'projectId': serializer.toJson<String>(projectId),
+      'userId': serializer.toJson<String>(userId),
+      'projectRole': serializer.toJson<String>(projectRole),
+    };
+  }
+
+  ProjectMember copyWith(
+          {String? projectId, String? userId, String? projectRole}) =>
+      ProjectMember(
+        projectId: projectId ?? this.projectId,
+        userId: userId ?? this.userId,
+        projectRole: projectRole ?? this.projectRole,
+      );
+  ProjectMember copyWithCompanion(ProjectMembersCompanion data) {
+    return ProjectMember(
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      projectRole:
+          data.projectRole.present ? data.projectRole.value : this.projectRole,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProjectMember(')
+          ..write('projectId: $projectId, ')
+          ..write('userId: $userId, ')
+          ..write('projectRole: $projectRole')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(projectId, userId, projectRole);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProjectMember &&
+          other.projectId == this.projectId &&
+          other.userId == this.userId &&
+          other.projectRole == this.projectRole);
+}
+
+class ProjectMembersCompanion extends UpdateCompanion<ProjectMember> {
+  final Value<String> projectId;
+  final Value<String> userId;
+  final Value<String> projectRole;
+  final Value<int> rowid;
+  const ProjectMembersCompanion({
+    this.projectId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.projectRole = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProjectMembersCompanion.insert({
+    required String projectId,
+    required String userId,
+    required String projectRole,
+    this.rowid = const Value.absent(),
+  })  : projectId = Value(projectId),
+        userId = Value(userId),
+        projectRole = Value(projectRole);
+  static Insertable<ProjectMember> custom({
+    Expression<String>? projectId,
+    Expression<String>? userId,
+    Expression<String>? projectRole,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (projectId != null) 'project_id': projectId,
+      if (userId != null) 'user_id': userId,
+      if (projectRole != null) 'project_role': projectRole,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProjectMembersCompanion copyWith(
+      {Value<String>? projectId,
+      Value<String>? userId,
+      Value<String>? projectRole,
+      Value<int>? rowid}) {
+    return ProjectMembersCompanion(
+      projectId: projectId ?? this.projectId,
+      userId: userId ?? this.userId,
+      projectRole: projectRole ?? this.projectRole,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (projectRole.present) {
+      map['project_role'] = Variable<String>(projectRole.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProjectMembersCompanion(')
+          ..write('projectId: $projectId, ')
+          ..write('userId: $userId, ')
+          ..write('projectRole: $projectRole, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3990,6 +4226,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SyncDeletionsTable syncDeletions = $SyncDeletionsTable(this);
   late final $InterviewDraftsTable interviewDrafts =
       $InterviewDraftsTable(this);
+  late final $ProjectMembersTable projectMembers = $ProjectMembersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4002,7 +4239,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         responses,
         participants,
         syncDeletions,
-        interviewDrafts
+        interviewDrafts,
+        projectMembers
       ];
 }
 
@@ -5931,6 +6169,154 @@ typedef $$InterviewDraftsTableProcessedTableManager = ProcessedTableManager<
     ),
     InterviewDraft,
     PrefetchHooks Function()>;
+typedef $$ProjectMembersTableCreateCompanionBuilder = ProjectMembersCompanion
+    Function({
+  required String projectId,
+  required String userId,
+  required String projectRole,
+  Value<int> rowid,
+});
+typedef $$ProjectMembersTableUpdateCompanionBuilder = ProjectMembersCompanion
+    Function({
+  Value<String> projectId,
+  Value<String> userId,
+  Value<String> projectRole,
+  Value<int> rowid,
+});
+
+class $$ProjectMembersTableFilterComposer
+    extends Composer<_$AppDatabase, $ProjectMembersTable> {
+  $$ProjectMembersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get projectId => $composableBuilder(
+      column: $table.projectId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get projectRole => $composableBuilder(
+      column: $table.projectRole, builder: (column) => ColumnFilters(column));
+}
+
+class $$ProjectMembersTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProjectMembersTable> {
+  $$ProjectMembersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get projectId => $composableBuilder(
+      column: $table.projectId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get projectRole => $composableBuilder(
+      column: $table.projectRole, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ProjectMembersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProjectMembersTable> {
+  $$ProjectMembersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get projectRole => $composableBuilder(
+      column: $table.projectRole, builder: (column) => column);
+}
+
+class $$ProjectMembersTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ProjectMembersTable,
+    ProjectMember,
+    $$ProjectMembersTableFilterComposer,
+    $$ProjectMembersTableOrderingComposer,
+    $$ProjectMembersTableAnnotationComposer,
+    $$ProjectMembersTableCreateCompanionBuilder,
+    $$ProjectMembersTableUpdateCompanionBuilder,
+    (
+      ProjectMember,
+      BaseReferences<_$AppDatabase, $ProjectMembersTable, ProjectMember>
+    ),
+    ProjectMember,
+    PrefetchHooks Function()> {
+  $$ProjectMembersTableTableManager(
+      _$AppDatabase db, $ProjectMembersTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProjectMembersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProjectMembersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProjectMembersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> projectId = const Value.absent(),
+            Value<String> userId = const Value.absent(),
+            Value<String> projectRole = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProjectMembersCompanion(
+            projectId: projectId,
+            userId: userId,
+            projectRole: projectRole,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String projectId,
+            required String userId,
+            required String projectRole,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProjectMembersCompanion.insert(
+            projectId: projectId,
+            userId: userId,
+            projectRole: projectRole,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$ProjectMembersTable, ProjectMember>(table),
+                    BaseReferences<_$AppDatabase, $ProjectMembersTable,
+                        ProjectMember>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ProjectMembersTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ProjectMembersTable,
+    ProjectMember,
+    $$ProjectMembersTableFilterComposer,
+    $$ProjectMembersTableOrderingComposer,
+    $$ProjectMembersTableAnnotationComposer,
+    $$ProjectMembersTableCreateCompanionBuilder,
+    $$ProjectMembersTableUpdateCompanionBuilder,
+    (
+      ProjectMember,
+      BaseReferences<_$AppDatabase, $ProjectMembersTable, ProjectMember>
+    ),
+    ProjectMember,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5951,4 +6337,6 @@ class $AppDatabaseManager {
       $$SyncDeletionsTableTableManager(_db, _db.syncDeletions);
   $$InterviewDraftsTableTableManager get interviewDrafts =>
       $$InterviewDraftsTableTableManager(_db, _db.interviewDrafts);
+  $$ProjectMembersTableTableManager get projectMembers =>
+      $$ProjectMembersTableTableManager(_db, _db.projectMembers);
 }

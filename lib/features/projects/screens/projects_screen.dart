@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/app_models.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'create_project_dialog.dart';
@@ -186,6 +188,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 
   Widget _buildProjectCard(ResearchProject project) {
+    final currentUserId = ref.read(currentUserProvider)?.id;
+    final isOwner = project.ownerId == currentUserId;
     Color statusColor;
     switch (project.status) {
       case ResearchStatus.active:
@@ -257,7 +261,40 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                           ),
                         ),
                       ),
-                      PopupMenuButton<String>(
+                      FutureBuilder<String?>(
+                        future: ref
+                            .read(databaseProvider)
+                            .getProjectMembershipRole(project.id),
+                        builder: (context, snapshot) {
+                          final role = snapshot.data;
+                          if (role == null) return const SizedBox.shrink();
+                          final label = switch (role) {
+                            'studentCollaborator' => 'COLLABORATOR',
+                            'fieldEnumerator' => 'ENUMERATOR',
+                            'ethicsReviewer' => 'ETHICS',
+                            _ => role.toUpperCase(),
+                          };
+                          return Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00897B).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'SHARED • $label',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF00897B),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      if (isOwner)
+                        PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert_rounded, size: 18),
                         onSelected: (val) {
                           if (val == 'duplicate') {

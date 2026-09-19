@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:ui';
 import '../../core/providers/projects_provider.dart';
 import '../../core/providers/auth_provider.dart';
 
@@ -127,14 +128,28 @@ class _ResearchExpertDialogState extends ConsumerState<ResearchExpertDialog> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final panelWidth = screenWidth < 560 ? screenWidth : 460.0;
     final isCompact = screenWidth < 560;
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 18,
-      borderRadius: isCompact
-          ? BorderRadius.zero
-          : const BorderRadius.horizontal(left: Radius.circular(22)),
-      clipBehavior: Clip.antiAlias,
-      child: SafeArea(
+    final panelRadius = isCompact
+        ? BorderRadius.zero
+        : const BorderRadius.horizontal(left: Radius.circular(22));
+
+    return ClipRRect(
+      borderRadius: panelRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: panelRadius,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.78)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 28,
+                offset: const Offset(-8, 0),
+              ),
+            ],
+          ),
+          child: SafeArea(
         left: false,
         child: AnimatedPadding(
           duration: const Duration(milliseconds: 160),
@@ -261,8 +276,28 @@ class _ResearchExpertDialogState extends ConsumerState<ResearchExpertDialog> {
                             maxLines: 3,
                             minLines: 1,
                             maxLength: 4000,
-                            decoration: const InputDecoration(
-                                hintText: 'Ask a research question…',
+                            decoration: InputDecoration(
+                                hintText: 'Ask Research Expert',
+                                filled: true,
+                                fillColor: Colors.white.withValues(alpha: 0.58),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(18)),
+                                  borderSide: BorderSide(
+                                      color: Colors.white.withValues(alpha: 0.8)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(18)),
+                                  borderSide: BorderSide(
+                                      color: Colors.white.withValues(alpha: 0.8)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(18)),
+                                  borderSide: BorderSide(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.7)),
+                                ),
                                 counterText: ''),
                             onSubmitted: (_) => send())),
                     IconButton(
@@ -271,6 +306,8 @@ class _ResearchExpertDialogState extends ConsumerState<ResearchExpertDialog> {
                         icon: const Icon(Icons.send))
                   ]),
                 ])),
+          ),
+        ),
           ),
         ),
       ),

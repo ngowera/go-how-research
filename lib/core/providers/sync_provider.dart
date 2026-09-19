@@ -248,10 +248,20 @@ class SyncNotifier extends StateNotifier<SyncState> {
   }
 
   Future<void> _pullCloudData(SupabaseClient supabase, String userId) async {
-    final projectRows = await supabase
-        .from('projects')
-        .select()
-        .or('owner_id.eq.$userId,supervisor_id.eq.$userId');
+    final membershipRows = await supabase
+        .from('project_members')
+        .select('project_id,user_id,project_role')
+        .eq('user_id', userId);
+    for (final rawMembership in membershipRows) {
+      await _db.upsertProjectMembership(
+        projectId: rawMembership['project_id'] as String,
+        userId: rawMembership['user_id'] as String,
+        projectRole: rawMembership['project_role'] as String,
+      );
+    }
+
+    // RLS now limits this query to owned, supervised, or accepted shared projects.
+    final projectRows = await supabase.from('projects').select();
 
     for (final rawProject in projectRows) {
       final projectJson = Map<String, dynamic>.from(rawProject);

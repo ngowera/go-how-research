@@ -8,8 +8,10 @@ import '../theme/app_theme.dart';
 import 'research_expert.dart';
 import 'profile_avatar.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/app_settings_provider.dart';
 import '../../core/providers/sync_provider.dart' as sync;
 import '../../core/router/app_router.dart';
+import '../../core/services/project_collaboration_service.dart';
 
 // ---------------------------------------------------------------------------
 // Sync status enum
@@ -130,6 +132,7 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
+    final settings = ref.watch(appSettingsProvider);
     final syncState = ref.watch(sync.syncProvider);
     final displayName = currentUser?.name ?? 'Local Researcher';
     final initials = displayName
@@ -163,6 +166,7 @@ class AppShell extends ConsumerWidget {
             // ----------------------------------------------------------------
             _Sidebar(
               selectedIndex: selectedIdx,
+              backgroundColor: Color(settings.sidebarColor),
               user: user,
               syncStatus: syncStatus,
               onLogout: () async {
@@ -177,7 +181,18 @@ class AppShell extends ConsumerWidget {
             // ----------------------------------------------------------------
             // Main content
             // ----------------------------------------------------------------
-            Expanded(child: child),
+            Expanded(
+              child: Stack(
+                children: [
+                  child,
+                  const Positioned(
+                    top: 10,
+                    right: 16,
+                    child: CollaborationNotificationBell(),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -200,12 +215,17 @@ class AppShell extends ConsumerWidget {
           ),
         ),
         title: _AppLogo(compact: true),
+        actions: const [
+          CollaborationNotificationBell(),
+          SizedBox(width: 8),
+        ],
       ),
       drawer: Drawer(
         width: 260,
         backgroundColor: Colors.white,
         child: _Sidebar(
           selectedIndex: selectedIdx,
+          backgroundColor: Color(settings.sidebarColor),
           user: user,
           syncStatus: syncStatus,
           onLogout: () async {
@@ -223,6 +243,119 @@ class AppShell extends ConsumerWidget {
   }
 }
 
+class CollaborationNotificationBell extends StatelessWidget {
+  const CollaborationNotificationBell({super.key});
+
+  Future<List<ProjectAccessRequest>> _requests() {
+    return ProjectCollaborationService().incomingRequests();
+  }
+
+  void _showRequests(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: FutureBuilder<List<ProjectAccessRequest>>(
+          future: _requests(),
+          builder: (context, snapshot) {
+            final requests = snapshot.data ?? const <ProjectAccessRequest>[];
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                  height: 160,
+                  child: Center(child: CircularProgressIndicator()));
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Collaboration requests',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  if (requests.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Text('No pending join requests.'),
+                    )
+                  else
+                    ...requests.map(
+                      (request) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.person_add_alt_1_outlined),
+                        title: Text(request.requesterName),
+                        subtitle: Text(
+                            '${request.requesterEmail}\n${request.projectTitle} • ${request.requestedRole}'),
+                        isThreeLine: true,
+                      ),
+                    ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        GoRouter.of(context).go('/settings');
+                      },
+                      child: const Text('Open collaboration settings'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<ProjectAccessRequest>>(
+      future: _requests(),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.length ?? 0;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              tooltip: 'Collaboration requests',
+              onPressed: () => _showRequests(context),
+              icon: const Icon(Icons.notifications_none_rounded,
+                  color: AppColors.kPrimary),
+            ),
+            if (count > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: count > 1 ? 18 : 9,
+                  height: count > 1 ? 18 : 9,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: count > 1
+                      ? Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sidebar widget (shared between rail and drawer)
 // ---------------------------------------------------------------------------
@@ -230,6 +363,7 @@ class _Sidebar extends StatelessWidget {
   final int selectedIndex;
   final _UserInfo user;
   final SyncStatus syncStatus;
+  final Color backgroundColor;
   final ValueChanged<int> onItemTap;
   final VoidCallback onLogout;
 
@@ -237,16 +371,18 @@ class _Sidebar extends StatelessWidget {
     required this.selectedIndex,
     required this.user,
     required this.syncStatus,
+    required this.backgroundColor,
     required this.onItemTap,
     required this.onLogout,
   });
 
   @override
   Widget build(BuildContext context) {
+    final useLightForeground = backgroundColor.computeLuminance() < 0.35;
     return SizedBox(
       width: 240,
       child: Material(
-        color: Colors.white,
+        color: backgroundColor,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -278,6 +414,7 @@ class _Sidebar extends StatelessWidget {
                   return _NavTile(
                     item: item,
                     isSelected: isSelected,
+                    useLightForeground: useLightForeground,
                     onTap: () => onItemTap(i),
                   );
                 },
@@ -302,11 +439,13 @@ class _Sidebar extends StatelessWidget {
 class _NavTile extends StatelessWidget {
   final _NavItem item;
   final bool isSelected;
+  final bool useLightForeground;
   final VoidCallback onTap;
 
   const _NavTile({
     required this.item,
     required this.isSelected,
+    required this.useLightForeground,
     required this.onTap,
   });
 
@@ -334,7 +473,9 @@ class _NavTile extends StatelessWidget {
                 Icon(
                   isSelected ? item.activeIcon : item.icon,
                   size: 20,
-                  color: isSelected ? Colors.white : const Color(0xFF6B7280),
+                    color: isSelected || useLightForeground
+                      ? Colors.white
+                      : const Color(0xFF6B7280),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -344,8 +485,9 @@ class _NavTile extends StatelessWidget {
                       fontSize: 13,
                       fontWeight:
                           isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color:
-                          isSelected ? Colors.white : const Color(0xFF6B7280),
+                        color: isSelected || useLightForeground
+                          ? Colors.white
+                          : const Color(0xFF6B7280),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

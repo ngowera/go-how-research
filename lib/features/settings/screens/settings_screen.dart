@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/models/app_models.dart';
@@ -15,6 +16,7 @@ import '../../../core/utils/export_utils.dart';
 import '../../../core/utils/sample_data_seeder.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'appearance_card.dart';
+import 'project_collaboration_card.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -42,6 +44,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   };
   bool _isLoadingStats = true;
   bool _isSeeding = false;
+  Future<Map<String, dynamic>?>? _cloudUsageFuture;
 
   @override
   void initState() {
@@ -57,6 +60,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     _orcidController = TextEditingController(text: settings.orcidId);
 
     _refreshDbStats();
+    _cloudUsageFuture = _loadCloudUsage();
   }
 
   @override
@@ -71,6 +75,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   Future<void> _refreshDbStats() async {
     setState(() => _isLoadingStats = true);
+    _cloudUsageFuture = _loadCloudUsage();
     try {
       final db = ref.read(databaseProvider);
       final stats = await db.getDatabaseStats();
@@ -83,6 +88,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     } catch (_) {
       if (mounted) setState(() => _isLoadingStats = false);
     }
+  }
+
+  Future<Map<String, dynamic>?> _loadCloudUsage() async {
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'storage-usage',
+        body: const {},
+      );
+      if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _formatBytes(num bytes) {
+    if (bytes < 1024) return '${bytes.toStringAsFixed(0)} B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   Future<void> _seedData() async {
@@ -229,13 +256,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Top Header Bar ───────────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final narrow = constraints.maxWidth < 700;
+                final heading = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
                       children: [
                         Text(
                           'Settings & System Hub',
@@ -245,7 +274,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             color: const Color(0xFF1E293B),
                           ),
                         ),
-                        const SizedBox(width: 12),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
@@ -275,16 +303,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       ),
                     ),
                   ],
-                ),
-                // Quick actions on top
-                Row(
+                );
+                final actions = Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
                   children: [
                     OutlinedButton.icon(
                       onPressed: _refreshDbStats,
                       icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: const Text('Refresh'),
                     ),
-                    const SizedBox(width: 10),
                     ElevatedButton.icon(
                       onPressed: () async {
                         await ref.read(authStateProvider.notifier).logout();
@@ -298,8 +326,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       ),
                     ),
                   ],
-                ),
-              ],
+                );
+                if (narrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      heading,
+                      const SizedBox(height: 12),
+                      actions,
+                    ],
+                  );
+                }
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: heading),
+                    const SizedBox(width: 20),
+                    actions,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 20),
 
@@ -352,7 +399,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   _buildSurveyDefaultsTab(settings),
                   _buildStatisticalEngineTab(settings),
                   _buildCloudSyncTab(syncState, settings),
-                  _buildDatabaseStorageTab(),
+                  _buildDatabaseStorageTab(syncState),
                 ],
               ),
             ),
@@ -375,101 +422,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             children: [
               // User Card
               const AppearanceCard(),
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 36,
-                      backgroundColor: AppTheme.kPrimary.withOpacity(0.12),
-                      child: Text(
-                        (user?.name.isNotEmpty ?? false)
-                            ? user!.name.substring(0, 1).toUpperCase()
-                            : 'R',
-                        style: GoogleFonts.poppins(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.kPrimary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user?.name ?? 'Lead Researcher',
-                            style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1E293B),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user?.email ?? 'researcher@university.edu',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.kPrimary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'ROLE: ${user?.role.name.toUpperCase() ?? "STUDENT"}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.kPrimary,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'AUTHENTICATED',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.green.shade700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 24),
+              const ProjectCollaborationCard(),
               const SizedBox(height: 24),
 
               // Academic Information Form
@@ -688,12 +642,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           children: [
             Icon(icon, size: 16, color: isSelected ? Colors.white : color),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : const Color(0xFF334155),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF334155),
+                ),
               ),
             ),
           ],
@@ -743,7 +701,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   title: 'Survey Form Display Layout',
                   subtitle:
                       'Choose whether survey questions appear as one long scrollable page or step-by-step.',
-                  child: Row(
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
                       ChoiceChip(
                         label: const Text('Scrollable Single-Page'),
@@ -758,7 +718,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           }
                         },
                       ),
-                      const SizedBox(width: 10),
                       ChoiceChip(
                         label: const Text('Focus Mode (Question-by-Question)'),
                         selected:
@@ -1244,7 +1203,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   // ===========================================================================
   // TAB 5: Database & Storage Health
   // ===========================================================================
-  Widget _buildDatabaseStorageTab() {
+  Widget _buildDatabaseStorageTab(SyncState syncState) {
     return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
@@ -1253,64 +1212,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Counters Row
-              Row(
-                children: [
-                  Expanded(
-                    child: _statBox(
-                      title: 'Projects',
-                      count: _isLoadingStats
-                          ? '...'
-                          : '${_dbStats['projects'] ?? 0}',
-                      icon: Icons.folder_rounded,
-                      color: const Color(0xFF1565C0),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _statBox(
-                      title: 'Questionnaires',
-                      count: _isLoadingStats
-                          ? '...'
-                          : '${_dbStats['questionnaires'] ?? 0}',
-                      icon: Icons.assignment_rounded,
-                      color: const Color(0xFF00897B),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _statBox(
-                      title: 'Questions',
-                      count: _isLoadingStats
-                          ? '...'
-                          : '${_dbStats['questions'] ?? 0}',
-                      icon: Icons.help_outline_rounded,
-                      color: const Color(0xFFF57C00),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _statBox(
-                      title: 'Responses',
-                      count: _isLoadingStats
-                          ? '...'
-                          : '${_dbStats['responses'] ?? 0}',
-                      icon: Icons.table_chart_rounded,
-                      color: const Color(0xFF7B1FA2),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _statBox(
-                      title: 'Participants',
-                      count: _isLoadingStats
-                          ? '...'
-                          : '${_dbStats['participants'] ?? 0}',
-                      icon: Icons.people_rounded,
-                      color: const Color(0xFF2E7D32),
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isPhone = constraints.maxWidth < 560;
+                  final cardWidth = isPhone
+                      ? (constraints.maxWidth - 12) / 2
+                      : (constraints.maxWidth - 48) / 5;
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: cardWidth,
+                        child: _statBox(
+                          title: 'Projects',
+                          count: _isLoadingStats
+                              ? '...'
+                              : '${_dbStats['projects'] ?? 0}',
+                          icon: Icons.folder_rounded,
+                          color: const Color(0xFF1565C0),
+                        ),
+                      ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _statBox(
+                          title: 'Questionnaires',
+                          count: _isLoadingStats
+                              ? '...'
+                              : '${_dbStats['questionnaires'] ?? 0}',
+                          icon: Icons.assignment_rounded,
+                          color: const Color(0xFF00897B),
+                        ),
+                      ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _statBox(
+                          title: 'Questions',
+                          count: _isLoadingStats
+                              ? '...'
+                              : '${_dbStats['questions'] ?? 0}',
+                          icon: Icons.help_outline_rounded,
+                          color: const Color(0xFFF57C00),
+                        ),
+                      ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _statBox(
+                          title: 'Responses',
+                          count: _isLoadingStats
+                              ? '...'
+                              : '${_dbStats['responses'] ?? 0}',
+                          icon: Icons.table_chart_rounded,
+                          color: const Color(0xFF7B1FA2),
+                        ),
+                      ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _statBox(
+                          title: 'Participants',
+                          count: _isLoadingStats
+                              ? '...'
+                              : '${_dbStats['participants'] ?? 0}',
+                          icon: Icons.people_rounded,
+                          color: const Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
+              const SizedBox(height: 24),
+
+              _buildCloudHealthCard(syncState),
               const SizedBox(height: 24),
 
               // Action Cards Container
@@ -1343,149 +1316,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     const Divider(height: 32),
 
                     // Seed Sample Data Tool
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.kPrimary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.dataset_rounded,
-                              color: AppTheme.kPrimary),
+                    _buildDatabaseAction(
+                      icon: Icons.dataset_rounded,
+                      iconColor: AppTheme.kPrimary,
+                      iconBackground: AppTheme.kPrimary.withOpacity(0.1),
+                      title:
+                          'Load Sample Research Study (Instant Test Dataset)',
+                      description:
+                          'Seeds a complete study with 1 questionnaire, 7 questions, and 15 completed responses to test charts, cross-tabs, and reports.',
+                      action: ElevatedButton.icon(
+                        onPressed: _isSeeding ? null : _seedData,
+                        icon: _isSeeding
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.download_rounded, size: 16),
+                        label: Text(
+                            _isSeeding ? 'Seeding...' : 'Load Sample Study'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.kPrimary,
+                          foregroundColor: Colors.white,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Load Sample Research Study (Instant Test Dataset)',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Seeds a complete study with 1 questionnaire, 7 questions, and 15 completed responses to test charts, cross-tabs, and reports.',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _isSeeding ? null : _seedData,
-                          icon: _isSeeding
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.download_rounded, size: 16),
-                          label: Text(
-                              _isSeeding ? 'Seeding...' : 'Load Sample Study'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.kPrimary,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                     const Divider(height: 28),
 
                     // Export Backup
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00897B).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.file_download_outlined,
-                              color: Color(0xFF00897B)),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Export Database Snapshot (JSON Backup)',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Creates an offline JSON archive containing all projects, questionnaires, responses, and participants.',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _exportDatabaseBackup,
-                          icon: const Icon(Icons.save_alt_rounded, size: 16),
-                          label: const Text('Export JSON'),
-                        ),
-                      ],
+                    _buildDatabaseAction(
+                      icon: Icons.file_download_outlined,
+                      iconColor: const Color(0xFF00897B),
+                      iconBackground: const Color(0xFF00897B).withOpacity(0.1),
+                      title: 'Export Database Snapshot (JSON Backup)',
+                      description:
+                          'Creates an offline JSON archive containing all projects, questionnaires, responses, and participants.',
+                      action: OutlinedButton.icon(
+                        onPressed: _exportDatabaseBackup,
+                        icon: const Icon(Icons.save_alt_rounded, size: 16),
+                        label: const Text('Export JSON'),
+                      ),
                     ),
                     const Divider(height: 28),
 
                     // Clear Database
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.delete_sweep_rounded,
-                              color: Colors.red),
+                    _buildDatabaseAction(
+                      icon: Icons.delete_sweep_rounded,
+                      iconColor: Colors.red,
+                      iconBackground: Colors.red.shade50,
+                      title: 'Clear Local Research Database',
+                      titleColor: Colors.red.shade700,
+                      description:
+                          'Resets all local study tables and deletes cached survey responses.',
+                      action: ElevatedButton.icon(
+                        onPressed: _confirmClearDatabase,
+                        icon:
+                            const Icon(Icons.delete_forever_rounded, size: 16),
+                        label: const Text('Reset Data'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          foregroundColor: Colors.white,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Clear Local Research Database',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.red.shade700,
-                                ),
-                              ),
-                              Text(
-                                'Resets all local study tables and deletes cached survey responses.',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _confirmClearDatabase,
-                          icon: const Icon(Icons.delete_forever_rounded,
-                              size: 16),
-                          label: const Text('Reset Data'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade600,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -1499,40 +1392,258 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   // ── Helper Widgets ─────────────────────────────────────────────────────────
 
+  Widget _buildCloudHealthCard(SyncState syncState) {
+    final user = ref.watch(currentUserProvider);
+    bool cloudConfigured = false;
+    String cloudUser = 'Not signed in to Supabase';
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      cloudConfigured = session != null;
+      cloudUser = session?.user.email ?? cloudUser;
+    } catch (_) {}
+
+    final totalRecords =
+        _dbStats.values.fold<int>(0, (sum, value) => sum + value);
+    final syncedRecords =
+        (totalRecords - syncState.pendingCount).clamp(0, totalRecords);
+    final syncProgress = totalRecords == 0 ? 0.0 : syncedRecords / totalRecords;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cloud_done_rounded,
+                  color:
+                      cloudConfigured ? const Color(0xFF00897B) : Colors.grey),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Supabase Server Health',
+                    style: GoogleFonts.poppins(
+                        fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              Text(cloudConfigured ? 'Connected' : 'Offline',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: cloudConfigured
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey.shade600)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text('Authenticated user: ${user?.email ?? cloudUser}',
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: Colors.grey.shade700)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text('Local records ready to sync',
+                    style: GoogleFonts.poppins(fontSize: 12)),
+              ),
+              const SizedBox(width: 12),
+              Text('$syncedRecords / $totalRecords',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: syncProgress,
+              minHeight: 9,
+              backgroundColor: Colors.grey.shade200,
+              color: const Color(0xFF00897B),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            syncState.lastSyncTime == null
+                ? 'No completed sync recorded on this device.'
+                : 'Last sync: ${syncState.lastSyncTime}',
+            style:
+                GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Exact usage is read through a protected server function; the service-role key never enters the app.',
+            style:
+                GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _cloudUsageFuture,
+            builder: (context, snapshot) {
+              final usage = snapshot.data;
+              if (usage == null) {
+                return Text(
+                  'Server usage is unavailable until the storage-usage function is deployed.',
+                  style: GoogleFonts.poppins(
+                      fontSize: 11, color: Colors.grey.shade600),
+                );
+              }
+              final databaseBytes = usage['databaseBytes'] as num? ?? 0;
+              final storageBytes = usage['storageBytes'] as num? ?? 0;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _usageMetric('Database', _formatBytes(databaseBytes)),
+                  _usageMetric('File storage', _formatBytes(storageBytes)),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _usageMetric(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2F1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text('$label: $value',
+          style:
+              GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _buildDatabaseAction({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBackground,
+    required String title,
+    required String description,
+    required Widget action,
+    Color? titleColor,
+  }) {
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: titleColor,
+          ),
+        ),
+        Text(
+          description,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isPhone = constraints.maxWidth < 560;
+        final iconBox = Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconBackground,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor),
+        );
+
+        if (isPhone) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  iconBox,
+                  const SizedBox(width: 14),
+                  Expanded(child: details),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(alignment: Alignment.centerLeft, child: action),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            iconBox,
+            const SizedBox(width: 14),
+            Expanded(child: details),
+            action,
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSettingTile({
     required String title,
     required String subtitle,
     required Widget child,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final description = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF1E293B),
           ),
         ),
-        const SizedBox(width: 20),
-        child,
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isPhone = constraints.maxWidth < 560;
+        if (isPhone) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              description,
+              const SizedBox(height: 12),
+              Align(alignment: Alignment.centerLeft, child: child),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: description),
+            const SizedBox(width: 20),
+            child,
+          ],
+        );
+      },
     );
   }
 

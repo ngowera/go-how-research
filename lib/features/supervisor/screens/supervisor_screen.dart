@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/models/app_models.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
@@ -25,67 +24,63 @@ class SupervisorScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isPhone = constraints.maxWidth < 600;
+          return Padding(
+            padding: EdgeInsets.all(isPhone ? 16 : 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                isPhone
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeaderTitle(),
+                          const SizedBox(height: 12),
+                          _buildRoleBadge(user),
+                        ],
+                      )
+                    : Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Supervisor Collaboration Portal',
-                      style: GoogleFonts.poppins(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Academic review, questionnaire validation, ethics oversight and feedback',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7B1FA2).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: const Color(0xFF7B1FA2).withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.school_rounded,
-                          color: Color(0xFF7B1FA2), size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Role: ${user?.role.name.toUpperCase() ?? "SUPERVISOR"}',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: const Color(0xFF7B1FA2),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Flexible(child: _buildHeaderTitle()),
+                _buildRoleBadge(user),
               ],
             ),
             const SizedBox(height: 28),
 
             // Overview cards
-            Row(
-              children: [
+            isPhone
+                ? Column(
+                    children: [
+                      _buildCountCard(
+                        title: 'Supervised Projects',
+                        count: '${projectsState.projects.length}',
+                        icon: Icons.folder_special_rounded,
+                        color: const Color(0xFF1565C0),
+                        bg: const Color(0xFFE3F2FD),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCountCard(
+                        title: 'Pending Review',
+                        count: '${pendingQuestionnaires.length}',
+                        icon: Icons.pending_actions_rounded,
+                        color: const Color(0xFFF57C00),
+                        bg: const Color(0xFFFFF3E0),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCountCard(
+                        title: 'Approved Instruments',
+                        count: '${approvedQuestionnaires.length}',
+                        icon: Icons.verified_rounded,
+                        color: const Color(0xFF2E7D32),
+                        bg: const Color(0xFFE8F5E9),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
                 Expanded(
                   child: _buildCountCard(
                     title: 'Supervised Projects',
@@ -115,8 +110,8 @@ class SupervisorScreen extends ConsumerWidget {
                     bg: const Color(0xFFE8F5E9),
                   ),
                 ),
-              ],
-            ),
+                    ],
+                  ),
             const SizedBox(height: 32),
 
             // Pending Approvals Section
@@ -168,8 +163,20 @@ class SupervisorScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.orange.shade200),
                           ),
-                          child: Row(
-                            children: [
+                          child: isPhone
+                              ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    _buildApprovalIcon(),
+                                    const SizedBox(height: 12),
+                                    _buildApprovalDetails(q),
+                                    const SizedBox(height: 12),
+                                    _buildApprovalActions(context, ref, q),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
@@ -205,43 +212,17 @@ class SupervisorScreen extends ConsumerWidget {
                                   ],
                                 ),
                               ),
-                              OutlinedButton.icon(
-                                onPressed: () => context
-                                    .go('/questionnaires/${q.id}/builder'),
-                                icon: const Icon(Icons.visibility_outlined,
-                                    size: 16),
-                                label: const Text('Review Questions'),
-                              ),
-                              const SizedBox(width: 10),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  ref
-                                      .read(questionnairesProvider.notifier)
-                                      .approveQuestionnaire(q.id);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Questionnaire successfully approved! Field data collection unlocked.'),
-                                      backgroundColor: AppTheme.kSuccess,
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.check_circle_outline,
-                                    size: 16),
-                                label: const Text('Approve Instrument'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2E7D32),
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
+                              _buildApprovalActions(context, ref, q),
                             ],
                           ),
                         );
                       },
                     ),
             ),
-          ],
-        ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -254,6 +235,7 @@ class SupervisorScreen extends ConsumerWidget {
     required Color bg,
   }) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -295,6 +277,129 @@ class SupervisorScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHeaderTitle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Supervisor Collaboration Portal',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.poppins(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Academic review, questionnaire validation, ethics oversight and feedback',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleBadge(dynamic user) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF7B1FA2).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF7B1FA2).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.school_rounded,
+              color: Color(0xFF7B1FA2), size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Role: ${user?.role.name.toUpperCase() ?? "SUPERVISOR"}',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: const Color(0xFF7B1FA2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApprovalIcon() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Icons.assignment_late_rounded,
+          color: Color(0xFFF57C00)),
+    );
+  }
+
+  Widget _buildApprovalDetails(dynamic questionnaire) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(questionnaire.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E293B))),
+        const SizedBox(height: 4),
+        Text(
+          'Version ${questionnaire.version} • Submitted for validation • ${questionnaire.description}',
+          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildApprovalActions(
+      BuildContext context, WidgetRef ref, dynamic questionnaire) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () =>
+              context.go('/questionnaires/${questionnaire.id}/builder'),
+          icon: const Icon(Icons.visibility_outlined, size: 16),
+          label: const Text('Review Questions'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            ref
+                .read(questionnairesProvider.notifier)
+                .approveQuestionnaire(questionnaire.id);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Questionnaire successfully approved! Field data collection unlocked.'),
+                backgroundColor: AppTheme.kSuccess,
+              ),
+            );
+          },
+          icon: const Icon(Icons.check_circle_outline, size: 16),
+          label: const Text('Approve Instrument'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }

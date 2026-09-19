@@ -46,6 +46,8 @@ import '../../features/settings/screens/settings_screen.dart';
 import '../../features/interviews/interviews_screen.dart';
 import '../../features/analytics/screens/analysis_project_picker.dart';
 import '../providers/interviews_provider.dart';
+import '../providers/auth_provider.dart';
+import '../models/app_models.dart';
 
 // ---------------------------------------------------------------------------
 // Navigator keys
@@ -123,6 +125,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Already logged in → skip auth pages
       if (authenticated && isOnAuth) {
         return AppRoutes.dashboard;
+      }
+
+      final isSupervisorRoute = segments.firstOrNull == 'supervisor';
+      if (authenticated && isSupervisorRoute) {
+        final role = ref.read(currentUserProvider)?.role;
+        const allowedRoles = {
+          UserRole.supervisor,
+          UserRole.admin,
+          UserRole.ethicsOfficer,
+        };
+        if (!allowedRoles.contains(role)) return AppRoutes.dashboard;
       }
 
       return null; // no redirect

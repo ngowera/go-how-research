@@ -5,7 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/models/app_models.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../widgets/project_team_panel.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   final String projectId;
@@ -24,7 +27,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -98,10 +101,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   @override
   Widget build(BuildContext context) {
     final project = ref.watch(projectByIdProvider(widget.projectId));
+    final currentUser = ref.watch(currentUserProvider);
     final questionnairesState = ref.watch(questionnairesProvider);
     final questionnaires = questionnairesState.questionnaires
         .where((q) => q.projectId == widget.projectId)
         .toList();
+    final canManageQuestionnaires = project != null &&
+      (project.ownerId == currentUser?.id ||
+        project.supervisorId == currentUser?.id ||
+        currentUser?.role == UserRole.admin);
 
     if (project == null) {
       return Scaffold(
@@ -171,15 +179,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                       label: const Text('Analytics'),
                     ),
                     const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () => _showNewQuestionnaireDialog(context),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add Questionnaire'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.kPrimary,
-                        foregroundColor: Colors.white,
+                    if (canManageQuestionnaires)
+                      ElevatedButton.icon(
+                        onPressed: () => _showNewQuestionnaireDialog(context),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Add Questionnaire'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.kPrimary,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -202,6 +211,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                 Tab(
                     icon: Icon(Icons.table_chart_outlined),
                     text: 'Responses & Data'),
+                Tab(icon: Icon(Icons.groups_outlined), text: 'Team'),
               ],
             ),
             const Divider(height: 1),
@@ -323,16 +333,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                onPressed: () =>
-                                    _showNewQuestionnaireDialog(context),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Create Questionnaire'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.kPrimary,
-                                  foregroundColor: Colors.white,
+                              if (canManageQuestionnaires)
+                                ElevatedButton.icon(
+                                  onPressed: () =>
+                                      _showNewQuestionnaireDialog(context),
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Create Questionnaire'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.kPrimary,
+                                    foregroundColor: Colors.white,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         )
@@ -368,17 +379,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                                     label: const Text('Collect Data'),
                                   ),
                                   const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () => context
-                                        .go('/questionnaires/${q.id}/builder'),
-                                    icon: const Icon(Icons.tune_rounded,
-                                        size: 16),
-                                    label: const Text('Open Builder'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.kPrimary,
-                                      foregroundColor: Colors.white,
+                                  if (canManageQuestionnaires)
+                                    ElevatedButton.icon(
+                                      onPressed: () => context.go(
+                                          '/questionnaires/${q.id}/builder'),
+                                      icon: const Icon(Icons.tune_rounded,
+                                          size: 16),
+                                      label: const Text('Open Builder'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.kPrimary,
+                                        foregroundColor: Colors.white,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             );
@@ -421,6 +433,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                       ],
                     ),
                   ),
+
+                  // 4. Team
+                  ProjectTeamPanel(projectId: project.id),
                 ],
               ),
             ),

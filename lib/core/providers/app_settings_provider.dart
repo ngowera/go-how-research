@@ -24,8 +24,8 @@ class AppSettings {
   final bool autoSyncOnReconnect;
   final ParticipantIdentityMode participantIdentityMode;
   final int accentColor;
-  final double textScale;
   final bool compactLayout;
+  final int sidebarColor;
 
   const AppSettings({
     this.department = 'Faculty of Health Sciences & Technology',
@@ -42,8 +42,8 @@ class AppSettings {
     this.autoSyncOnReconnect = true,
     this.participantIdentityMode = ParticipantIdentityMode.codeOnly,
     this.accentColor = 0xFF1565C0,
-    this.textScale = 1,
     this.compactLayout = false,
+    this.sidebarColor = 0xFFFFFFFF,
   });
 
   AppSettings copyWith({
@@ -61,13 +61,13 @@ class AppSettings {
     bool? autoSyncOnReconnect,
     ParticipantIdentityMode? participantIdentityMode,
     int? accentColor,
-    double? textScale,
     bool? compactLayout,
+    int? sidebarColor,
   }) {
     return AppSettings(
       accentColor: accentColor ?? this.accentColor,
-      textScale: textScale ?? this.textScale,
       compactLayout: compactLayout ?? this.compactLayout,
+      sidebarColor: sidebarColor ?? this.sidebarColor,
       department: department ?? this.department,
       orcidId: orcidId ?? this.orcidId,
       degreeProgram: degreeProgram ?? this.degreeProgram,
@@ -98,8 +98,8 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
       final p = await SharedPreferences.getInstance();
       state = AppSettings(
         accentColor: p.getInt('${_kPrefix}accent') ?? state.accentColor,
-        textScale: (p.getDouble('${_kPrefix}text_scale') ?? 1).clamp(.85, 1.3),
         compactLayout: p.getBool('${_kPrefix}compact') ?? false,
+        sidebarColor: p.getInt('${_kPrefix}sidebar') ?? state.sidebarColor,
         department: p.getString('${_kPrefix}dept') ?? state.department,
         orcidId: p.getString('${_kPrefix}orcid') ?? state.orcidId,
         degreeProgram: p.getString('${_kPrefix}degree') ?? state.degreeProgram,
@@ -141,14 +141,18 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     await p.setString('${_kPrefix}dept', v);
   }
 
-  Future<void> updateAppearance(
-      {int? accentColor, double? textScale, bool? compact}) async {
+  Future<void> updateAppearance({int? accentColor, bool? compact}) async {
     state = state.copyWith(
-        accentColor: accentColor, textScale: textScale, compactLayout: compact);
+        accentColor: accentColor, compactLayout: compact);
     final p = await SharedPreferences.getInstance();
     await p.setInt('${_kPrefix}accent', state.accentColor);
-    await p.setDouble('${_kPrefix}text_scale', state.textScale);
     await p.setBool('${_kPrefix}compact', state.compactLayout);
+  }
+
+  Future<void> updateSidebarColor(int color) async {
+    state = state.copyWith(sidebarColor: color);
+    final p = await SharedPreferences.getInstance();
+    await p.setInt('${_kPrefix}sidebar', color);
   }
 
   Future<void> updateOrcid(String v) async {

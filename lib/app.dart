@@ -23,10 +23,7 @@ class GoHowResearchApp extends ConsumerWidget {
             ? VisualDensity.compact
             : VisualDensity.standard,
       ),
-      builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(settings.textScale)),
-          child: child!),
+        builder: (context, child) => child!,
       routerConfig: router,
     );
   }

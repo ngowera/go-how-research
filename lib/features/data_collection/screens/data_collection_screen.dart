@@ -142,6 +142,8 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
           children: [
             Text(
               questionnaire?.title ?? 'Data Collection Form',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -150,6 +152,8 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
             ),
             Text(
               'Offline Data Collection • All entries saved locally to SQLite',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 color: Colors.grey.shade600,
@@ -367,17 +371,17 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.grey.shade200),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final isPhone = constraints.maxWidth < 520;
+                                final message = Text(
                                   'Ensure all required fields are answered.',
                                   style: GoogleFonts.poppins(
                                     fontSize: 13,
                                     color: Colors.grey.shade600,
                                   ),
-                                ),
-                                ElevatedButton.icon(
+                                );
+                                final button = ElevatedButton.icon(
                                   onPressed:
                                       _isSubmitting ? null : _submitResponse,
                                   icon: _isSubmitting
@@ -402,8 +406,23 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 24, vertical: 14),
                                   ),
-                                ),
-                              ],
+                                );
+                                return isPhone
+                                    ? Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          message,
+                                          const SizedBox(height: 12),
+                                          button,
+                                        ],
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [message, button],
+                                      );
+                              },
                             ),
                           ),
                         ],
@@ -585,8 +604,8 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
             final isSelected = currentVal == val;
             return InkWell(
               onTap: () => _setAnswer(q.id, val),
-              child: Container(
-                width: 70,
+              child: Expanded(
+                child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected ? AppTheme.kPrimary : Colors.grey.shade100,
@@ -596,13 +615,14 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
                         isSelected ? AppTheme.kPrimary : Colors.grey.shade300,
                   ),
                 ),
-                child: Center(
-                  child: Text(
-                    '$val',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                  child: Center(
+                    child: Text(
+                      '$val',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ),

@@ -45,6 +45,34 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
     }
   }
 
+  Future<void> _showPhotoActions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose another profile image'),
+              onTap: () => Navigator.pop(context, 'choose'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Remove photo'),
+              onTap: () => Navigator.pop(context, 'remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'choose') {
+      await pickPhoto();
+    } else if (action == 'remove') {
+      await ref.read(authStateProvider.notifier).updateProfile(avatarUrl: '');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider),
@@ -55,33 +83,25 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
             padding: const EdgeInsets.all(18),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Your photo & appearance',
+                const Text('Your profile',
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              Wrap(
-                  spacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    ProfileAvatar(
-                        name: user?.name ?? '',
-                        image: user?.avatarUrl,
-                        radius: 32),
-                    FilledButton.icon(
-                        onPressed: busy ? null : pickPhoto,
-                        icon: const Icon(Icons.add_a_photo),
-                        label: Text(busy ? 'Saving…' : 'Choose profile photo')),
-                    TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => ref
-                                .read(authStateProvider.notifier)
-                                .updateProfile(avatarUrl: ''),
-                        child: const Text('Remove photo'))
-                  ]),
+                InkWell(
+                onTap: busy ? null : _showPhotoActions,
+                customBorder: const CircleBorder(),
+                child: ProfileAvatar(
+                  name: user?.name ?? '',
+                  image: user?.avatarUrl,
+                  radius: 48),
+                ),
+                const SizedBox(height: 10),
+                Text(user?.name ?? 'Researcher',
+                  style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
               if (error != null)
                 Text(error!, style: const TextStyle(color: Colors.red)),
               const SizedBox(height: 14),
-              const Text('Accent colour'),
+                const Text('Accent colour'),
               Wrap(
                   spacing: 8,
                   children: [0xFF1565C0, 0xFF00897B, 0xFF7B1FA2, 0xFFAD4B00]
@@ -99,19 +119,29 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
                           onSelected: (_) =>
                               notifier.updateAppearance(accentColor: color)))
                       .toList()),
-              Text('Text size: ${(settings.textScale * 100).round()}%'),
-              Slider(
-                  value: settings.textScale,
-                  min: .85,
-                  max: 1.3,
-                  divisions: 9,
-                  label: '${(settings.textScale * 100).round()}%',
-                  onChanged: (v) => notifier.updateAppearance(textScale: v)),
-              SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Compact controls'),
-                  value: settings.compactLayout,
-                  onChanged: (v) => notifier.updateAppearance(compact: v)),
+                const SizedBox(height: 12),
+                const Text('Sidebar colour'),
+                Wrap(
+                spacing: 8,
+                  children: (const [
+                    0xFFFFFFFF,
+                    0xFF000000,
+                    0xFF1565C0,
+                    0xFF00897B,
+                  ]).map((color) => ChoiceChip(
+                    label: Text(color == 0xFFFFFFFF
+                      ? 'White'
+                      : color == 0xFF000000
+                        ? 'Black'
+                        : color == 0xFF1565C0
+                          ? 'Blue'
+                          : 'Teal'),
+                    avatar: CircleAvatar(
+                      backgroundColor: Color(color), radius: 7),
+                    selected: settings.sidebarColor == color,
+                    onSelected: (_) => notifier.updateSidebarColor(color),
+                  )).toList(),
+                ),
             ])));
   }
 }
