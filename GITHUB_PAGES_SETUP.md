@@ -1,8 +1,8 @@
-# Publish on www.afrisoft.online
+# Publish on www.afrisoft.space
 
-Target repository: https://github.com/parcelexpert2-png/go-how-research
+Target repository: https://github.com/ngowera/go-how-research
 
-The app supports links such as `https://www.afrisoft.online/kondwani001`.
+The app supports links such as `https://www.afrisoft.space/kondwani001`.
 Each published questionnaire has a unique, fixed name enforced by Supabase.
 Multiple researchers can publish separate questionnaires without sharing access
 to each other's participants or responses. A link is public: anyone who has it
@@ -15,11 +15,11 @@ can answer, but cannot read responses.
    `SUPABASE_ANON_KEY` with the project's publishable/anon client key. Never put
    a service-role key or Gemini key here: web client values are publicly visible.
 3. In Settings → Pages select **GitHub Actions**, and set the custom domain to
-   `www.afrisoft.online`. The included workflow builds and deploys the Flutter app.
-4. In Namecheap DNS, point the `www` CNAME to `parcelexpert2-png.github.io`.
+   `www.afrisoft.space`. The included workflow builds and deploys the Flutter app.
+4. In Namecheap DNS, point the `www` CNAME to `ngowera.github.io`.
    Check existing DNS records before replacing them. Once GitHub validates the
    domain, enable HTTPS. Verify domain ownership in GitHub's Pages settings.
-5. Add `https://www.afrisoft.online` to the Supabase Auth site/redirect configuration
+5. Add `https://www.afrisoft.space` to the Supabase Auth site/redirect configuration
    if this is the primary sign-in site. Retain any other required app redirects.
 6. Open the site, sign in, and choose Questionnaires → **Collect / Share**. Use
    **Answer on this device** for local/offline collection. To accept browser

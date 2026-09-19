@@ -43,12 +43,12 @@ class _QuestionnaireShareDialogState extends ConsumerState<QuestionnaireShareDia
   @override
   Widget build(BuildContext context){
     final active=_link?['active']==true && DateTime.parse(_link!['expires_at']).isAfter(DateTime.now());
-    final url=_link==null?null:'https://www.afrisoft.online/${_link!['slug']}';
+    final url=_link==null?null:'https://www.afrisoft.space/${_link!['slug']}';
     return AlertDialog(title:const Text('Collect & share questionnaire'),content:SizedBox(width:520,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text(widget.questionnaire.title,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:12),
       OutlinedButton.icon(onPressed:_busy?null:(){Navigator.pop(context);context.go('/data-collection/${widget.questionnaire.id}');},icon:const Icon(Icons.phone_android),label:const Text('Answer on this device (works offline)')),
       const Divider(height:32),const Text('Online link — participants do not need an account.'),const SizedBox(height:12),
-      TextField(controller:_slug,enabled:!_busy && _link==null,decoration:const InputDecoration(labelText:'Unique link name',prefixText:'afrisoft.online/',hintText:'kondwani001',helperText:'6–60 lowercase letters, numbers or hyphens. Reserved once created.')),
+      TextField(controller:_slug,enabled:!_busy && _link==null,decoration:const InputDecoration(labelText:'Unique link name',prefixText:'afrisoft.space/',hintText:'kondwani001',helperText:'6–60 lowercase letters, numbers or hyphens. Reserved once created.')),
       const SizedBox(height:12),TextField(controller:_consent,enabled:!_busy,maxLines:4,decoration:const InputDecoration(labelText:'Study information and consent *',helperText:'Explain the purpose and what participants agree to.')),
       SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Collect participant names'),subtitle:const Text('Every participant also gets an identification code.'),value:_name,onChanged:_busy?null:(v)=>setState(()=>_name=v)),
       SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Ask for optional phone and email'),value:_contact,onChanged:_busy?null:(v)=>setState(()=>_contact=v)),
