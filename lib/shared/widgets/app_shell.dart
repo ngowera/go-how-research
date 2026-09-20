@@ -87,10 +87,11 @@ const List<_NavItem> _navItems = [
     route: '/participants',
   ),
   _NavItem(
-      label: 'Interviews',
-      icon: Icons.mic_none,
-      activeIcon: Icons.mic,
-      route: '/interviews'),
+    label: 'Interviews',
+    icon: Icons.mic_none,
+    activeIcon: Icons.mic,
+    route: '/interviews',
+  ),
   _NavItem(
     label: 'Supervisor',
     icon: Icons.supervisor_account_outlined,
@@ -157,7 +158,7 @@ class AppShell extends ConsumerWidget {
 
     if (useRail) {
       return Scaffold(
-        floatingActionButton: const ResearchExpertButton(),
+        floatingActionButton: const ResearchAssistantButton(),
         backgroundColor: AppColors.kBackground,
         body: Row(
           children: [
@@ -177,7 +178,10 @@ class AppShell extends ConsumerWidget {
             ),
             // Vertical divider
             const VerticalDivider(
-                width: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+              width: 1,
+              thickness: 1,
+              color: Color(0xFFE5E7EB),
+            ),
             // ----------------------------------------------------------------
             // Main content
             // ----------------------------------------------------------------
@@ -202,7 +206,7 @@ class AppShell extends ConsumerWidget {
     // Narrow screen: use Drawer
     // ------------------------------------------------------------------------
     return Scaffold(
-      floatingActionButton: const ResearchExpertButton(),
+      floatingActionButton: const ResearchAssistantButton(),
       backgroundColor: AppColors.kBackground,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -215,10 +219,7 @@ class AppShell extends ConsumerWidget {
           ),
         ),
         title: _AppLogo(compact: true),
-        actions: const [
-          CollaborationNotificationBell(),
-          SizedBox(width: 8),
-        ],
+        actions: const [CollaborationNotificationBell(), SizedBox(width: 8)],
       ),
       drawer: Drawer(
         width: 260,
@@ -261,8 +262,9 @@ class CollaborationNotificationBell extends StatelessWidget {
             final requests = snapshot.data ?? const <ProjectAccessRequest>[];
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const SizedBox(
-                  height: 160,
-                  child: Center(child: CircularProgressIndicator()));
+                height: 160,
+                child: Center(child: CircularProgressIndicator()),
+              );
             }
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
@@ -270,9 +272,10 @@ class CollaborationNotificationBell extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Collaboration requests',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w700)),
+                  const Text(
+                    'Collaboration requests',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
                   if (requests.isEmpty)
                     const Padding(
@@ -286,7 +289,8 @@ class CollaborationNotificationBell extends StatelessWidget {
                         leading: const Icon(Icons.person_add_alt_1_outlined),
                         title: Text(request.requesterName),
                         subtitle: Text(
-                            '${request.requesterEmail}\n${request.projectTitle} • ${request.requestedRole}'),
+                          '${request.requesterEmail}\n${request.projectTitle} • ${request.requestedRole}',
+                        ),
                         isThreeLine: true,
                       ),
                     ),
@@ -321,8 +325,10 @@ class CollaborationNotificationBell extends StatelessWidget {
             IconButton(
               tooltip: 'Collaboration requests',
               onPressed: () => _showRequests(context),
-              icon: const Icon(Icons.notifications_none_rounded,
-                  color: AppColors.kPrimary),
+              icon: const Icon(
+                Icons.notifications_none_rounded,
+                color: AppColors.kPrimary,
+              ),
             ),
             if (count > 0)
               Positioned(
@@ -473,7 +479,7 @@ class _NavTile extends StatelessWidget {
                 Icon(
                   isSelected ? item.activeIcon : item.icon,
                   size: 20,
-                    color: isSelected || useLightForeground
+                  color: isSelected || useLightForeground
                       ? Colors.white
                       : const Color(0xFF6B7280),
                 ),
@@ -483,9 +489,10 @@ class _NavTile extends StatelessWidget {
                     item.label,
                     style: GoogleFonts.poppins(
                       fontSize: 13,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected || useLightForeground
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: isSelected || useLightForeground
                           ? Colors.white
                           : const Color(0xFF6B7280),
                     ),
@@ -637,9 +644,10 @@ class _UserCard extends ConsumerWidget {
         children: [
           // Avatar
           ProfileAvatar(
-              name: user.name,
-              image: ref.watch(currentUserProvider)?.avatarUrl,
-              radius: 18),
+            name: user.name,
+            image: ref.watch(currentUserProvider)?.avatarUrl,
+            radius: 18,
+          ),
           const SizedBox(width: 10),
           // Name + role
           Expanded(

@@ -12,10 +12,7 @@ import 'package:gohow_research/shared/widgets/research_expert.dart';
 void main() {
   const phoneSize = Size(390, 844);
 
-  Future<AppDatabase> pumpScreen(
-    WidgetTester tester,
-    Widget screen,
-  ) async {
+  Future<AppDatabase> pumpScreen(WidgetTester tester, Widget screen) async {
     final database = AppDatabase(NativeDatabase.memory());
     await tester.binding.setSurfaceSize(phoneSize);
     addTearDown(() async {
@@ -67,7 +64,9 @@ void main() {
     );
 
     expect(
-        find.text('This questionnaire has no questions yet'), findsOneWidget);
+      find.text('This questionnaire has no questions yet'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -79,12 +78,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Research Expert uses the mobile-safe prompt', (tester) async {
-    await pumpScreen(tester, const ResearchExpertDialog());
+  testWidgets('Research Assistant uses the mobile-safe prompt', (tester) async {
+    await pumpScreen(tester, const ResearchAssistantPanel());
 
-    expect(find.text('Research Expert'), findsWidgets);
-    expect(
-        find.widgetWithText(TextField, 'Ask Research Expert'), findsOneWidget);
+    expect(find.text('Research Assistant'), findsWidgets);
+    expect(find.widgetWithText(TextField, 'Ask RA'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Research Assistant launcher opens over the current screen',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      const Scaffold(
+        body: Center(child: Text('Current research screen')),
+        floatingActionButton: ResearchAssistantButton(),
+      ),
+    );
+
+    expect(find.text('RA'), findsOneWidget);
+    await tester.tap(find.text('RA'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Current research screen'), findsOneWidget);
+    expect(find.text('Research Assistant'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Ask RA'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

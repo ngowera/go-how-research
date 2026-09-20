@@ -14,7 +14,7 @@ The function sources are `supabase/functions/research-expert/index.ts` and
 `supabase/functions/transcribe-interview/index.ts`. Interview database and private
 storage definitions are in `supabase/interviews_setup.sql`.
 
-Research Expert uses synced project summaries. It excludes participant names,
+Research Assistant uses synced project summaries. It excludes participant names,
 contact details, and raw free-text answers. Unsynced edits are not included.
 Transcription sends the selected recording to Gemini after confirmation and
 stores a draft transcript for review. Test both features with a short synthetic

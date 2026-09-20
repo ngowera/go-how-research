@@ -41,15 +41,20 @@ insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
  on conflict(id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
 drop policy if exists interview_audio_read on storage.objects;
 create policy interview_audio_read on storage.objects for select to authenticated using(bucket_id='interview-audio' and exists(
- select 1 from public.interviews i where i.storage_path=name));
+ select 1 from public.interviews i where i.storage_path=name and
+ (i.owner_id=auth.uid()::text or exists(select 1 from public.projects p where p.id=i.project_id and p.supervisor_id=auth.uid()::text))));
 drop policy if exists interview_audio_insert on storage.objects;
 create policy interview_audio_insert on storage.objects for insert to authenticated with check(bucket_id='interview-audio' and exists(
- select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text));
+ select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text)
+ and (storage.foldername(name))[1]=auth.uid()::text);
 drop policy if exists interview_audio_update on storage.objects;
 create policy interview_audio_update on storage.objects for update to authenticated using(bucket_id='interview-audio' and exists(
- select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text))
- with check(bucket_id='interview-audio' and exists(select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text));
+ select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text)
+ and owner_id=auth.uid()::text and (storage.foldername(name))[1]=auth.uid()::text)
+ with check(bucket_id='interview-audio' and exists(select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text)
+ and owner_id=auth.uid()::text and (storage.foldername(name))[1]=auth.uid()::text);
 drop policy if exists interview_audio_delete on storage.objects;
 create policy interview_audio_delete on storage.objects for delete to authenticated using(bucket_id='interview-audio' and exists(
- select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text));
+ select 1 from public.interviews i where i.storage_path=name and i.owner_id=auth.uid()::text)
+ and owner_id=auth.uid()::text and (storage.foldername(name))[1]=auth.uid()::text);
 commit;
