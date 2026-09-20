@@ -132,182 +132,198 @@ class _ResearchExpertDialogState extends ConsumerState<ResearchExpertDialog> {
         ? BorderRadius.zero
         : const BorderRadius.horizontal(left: Radius.circular(22));
 
-    return ClipRRect(
-      borderRadius: panelRadius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
-            borderRadius: panelRadius,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.78)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 28,
-                offset: const Offset(-8, 0),
+    return Material(
+      type: MaterialType.transparency,
+      child: ClipRRect(
+        borderRadius: panelRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              borderRadius: panelRadius,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.78)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 28,
+                  offset: const Offset(-8, 0),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              left: false,
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 160),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: SizedBox(
+                  width: panelWidth,
+                  height: double.infinity,
+                  child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+                      child: Column(children: [
+                        Row(children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text('AI',
+                                style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
+                                    fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Research Expert',
+                                    style: TextStyle(
+                                        fontSize: 19,
+                                        fontWeight: FontWeight.bold)),
+                                Text(
+                                    'Ask about your projects and synced findings',
+                                    style: TextStyle(fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close))
+                        ]),
+                        const Material(
+                            color: Color(0xFFFFF3CD),
+                            child: Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Text(
+                                    'Use Research Expert for confirmation only, and double-check its responses.',
+                                    style:
+                                        TextStyle(color: Color(0xFF654B00))))),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                            initialValue: projectId ?? '',
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                                labelText: 'Research context'),
+                            items: [
+                              const DropdownMenuItem(
+                                  value: '', child: Text('All my projects')),
+                              ...projects.map((p) => DropdownMenuItem(
+                                  value: p.id,
+                                  child: Text(p.title,
+                                      overflow: TextOverflow.ellipsis)))
+                            ],
+                            onChanged: busy
+                                ? null
+                                : (v) => setState(() {
+                                      projectId = v == '' ? null : v;
+                                      messages.clear();
+                                      coverage = null;
+                                      error = null;
+                                    })),
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                                'Uses synced study details and numeric/category summaries. Names, contacts and free-text answers are excluded. Unsynced changes are not included.',
+                                style: TextStyle(fontSize: 12))),
+                        Expanded(
+                            child: ListView(controller: scroll, children: [
+                          if (messages.isEmpty) ...[
+                            const Text(
+                                'Ask about your study, questionnaire or findings.'),
+                            ...[
+                              'What is missing from my study design?',
+                              'Explain the main patterns in my data.',
+                              'Which statistical test fits my research questions?'
+                            ].map((s) => TextButton(
+                                onPressed: () => input.text = s,
+                                child: Text(s))),
+                          ],
+                          ...messages.map((m) => Container(
+                              margin: const EdgeInsets.symmetric(vertical: 6),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                  color: m['role'] == 'user'
+                                      ? const Color(0xFFE3F2FD)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                        m['role'] == 'user'
+                                            ? 'You'
+                                            : 'Research Expert',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87)),
+                                    SelectableText(m['text']!,
+                                        style: const TextStyle(
+                                            color: Colors.black87))
+                                  ]))),
+                          if (busy) const LinearProgressIndicator(),
+                          if (error != null)
+                            Text(error!,
+                                style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.error)),
+                        ])),
+                        if (coverage != null)
+                          Text(coverage!, style: const TextStyle(fontSize: 10)),
+                        Row(children: [
+                          Expanded(
+                              child: TextField(
+                                  controller: input,
+                                  maxLines: 3,
+                                  minLines: 1,
+                                  maxLength: 4000,
+                                  decoration: InputDecoration(
+                                      hintText: 'Ask Research Expert',
+                                      filled: true,
+                                      fillColor:
+                                          Colors.white.withValues(alpha: 0.58),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                            Radius.circular(18)),
+                                        borderSide: BorderSide(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.8)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                            Radius.circular(18)),
+                                        borderSide: BorderSide(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.8)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                            Radius.circular(18)),
+                                        borderSide: BorderSide(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withValues(alpha: 0.7)),
+                                      ),
+                                      counterText: ''),
+                                  onSubmitted: (_) => send())),
+                          IconButton(
+                              tooltip: 'Send question',
+                              onPressed: busy ? null : send,
+                              icon: const Icon(Icons.send))
+                        ]),
+                      ])),
+                ),
               ),
-            ],
-          ),
-          child: SafeArea(
-        left: false,
-        child: AnimatedPadding(
-          duration: const Duration(milliseconds: 160),
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: SizedBox(
-            width: panelWidth,
-            height: double.infinity,
-            child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-                child: Column(children: [
-                  Row(children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text('AI',
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimary,
-                              fontWeight: FontWeight.w800)),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Research Expert',
-                              style: TextStyle(
-                                  fontSize: 19, fontWeight: FontWeight.bold)),
-                          Text('Ask about your projects and synced findings',
-                              style: TextStyle(fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close))
-                  ]),
-                  const Material(
-                      color: Color(0xFFFFF3CD),
-                      child: Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Text(
-                              'Use Research Expert for confirmation only, and double-check its responses.',
-                              style: TextStyle(color: Color(0xFF654B00))))),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                      initialValue: projectId ?? '',
-                      isExpanded: true,
-                      decoration:
-                          const InputDecoration(labelText: 'Research context'),
-                      items: [
-                        const DropdownMenuItem(
-                            value: '', child: Text('All my projects')),
-                        ...projects.map((p) => DropdownMenuItem(
-                            value: p.id,
-                            child:
-                                Text(p.title, overflow: TextOverflow.ellipsis)))
-                      ],
-                      onChanged: busy
-                          ? null
-                          : (v) => setState(() {
-                                projectId = v == '' ? null : v;
-                                messages.clear();
-                                coverage = null;
-                                error = null;
-                              })),
-                  const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                          'Uses synced study details and numeric/category summaries. Names, contacts and free-text answers are excluded. Unsynced changes are not included.',
-                          style: TextStyle(fontSize: 12))),
-                  Expanded(
-                      child: ListView(controller: scroll, children: [
-                    if (messages.isEmpty) ...[
-                      const Text(
-                          'Ask about your study, questionnaire or findings.'),
-                      ...[
-                        'What is missing from my study design?',
-                        'Explain the main patterns in my data.',
-                        'Which statistical test fits my research questions?'
-                      ].map((s) => TextButton(
-                          onPressed: () => input.text = s, child: Text(s))),
-                    ],
-                    ...messages.map((m) => Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: m['role'] == 'user'
-                                ? const Color(0xFFE3F2FD)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                  m['role'] == 'user'
-                                      ? 'You'
-                                      : 'Research Expert',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87)),
-                              SelectableText(m['text']!,
-                                  style: const TextStyle(color: Colors.black87))
-                            ]))),
-                    if (busy) const LinearProgressIndicator(),
-                    if (error != null)
-                      Text(error!,
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.error)),
-                  ])),
-                  if (coverage != null)
-                    Text(coverage!, style: const TextStyle(fontSize: 10)),
-                  Row(children: [
-                    Expanded(
-                        child: TextField(
-                            controller: input,
-                            maxLines: 3,
-                            minLines: 1,
-                            maxLength: 4000,
-                            decoration: InputDecoration(
-                                hintText: 'Ask Research Expert',
-                                filled: true,
-                                fillColor: Colors.white.withValues(alpha: 0.58),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(18)),
-                                  borderSide: BorderSide(
-                                      color: Colors.white.withValues(alpha: 0.8)),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(18)),
-                                  borderSide: BorderSide(
-                                      color: Colors.white.withValues(alpha: 0.8)),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(18)),
-                                  borderSide: BorderSide(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.7)),
-                                ),
-                                counterText: ''),
-                            onSubmitted: (_) => send())),
-                    IconButton(
-                        tooltip: 'Send question',
-                        onPressed: busy ? null : send,
-                        icon: const Icon(Icons.send))
-                  ]),
-                ])),
-          ),
-        ),
+            ),
           ),
         ),
       ),

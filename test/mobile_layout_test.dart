@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/native.dart';
 
 import 'package:gohow_research/core/database/app_database.dart';
 import 'package:gohow_research/features/data_collection/screens/data_collection_screen.dart';
@@ -15,17 +16,27 @@ void main() {
     WidgetTester tester,
     Widget screen,
   ) async {
-    final database = AppDatabase();
-    addTearDown(database.close);
+    final database = AppDatabase(NativeDatabase.memory());
     await tester.binding.setSurfaceSize(phoneSize);
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(() async {
+      // Unmount ProviderScope before closing the database so its active
+      // streams and notifiers can dispose cleanly.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await database.close();
+      await tester.binding.setSurfaceSize(null);
+    });
     await tester.pumpWidget(
       ProviderScope(
         overrides: [databaseProvider.overrideWithValue(database)],
         child: MaterialApp(home: screen),
       ),
     );
-    await tester.pumpAndSettle();
+    // These screens contain progress indicators and background providers that
+    // may remain active by design. A bounded pump renders the UI without
+    // waiting forever for every animation to become idle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     return database;
   }
 
@@ -35,12 +46,13 @@ void main() {
     expect(find.text('Settings & System Hub'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.drag(find.byType(TabBar), const Offset(-280, 0));
-    await tester.pumpAndSettle();
+    await tester.drag(find.byType(TabBar), const Offset(-600, 0));
+    await tester.pump(const Duration(milliseconds: 500));
     final databaseTab = find.text('Database & Storage Health');
     await tester.ensureVisible(databaseTab);
     await tester.tap(databaseTab);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Database Tools & Mock Data Generator'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
