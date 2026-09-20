@@ -3,14 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/models/app_models.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'questionnaire_share_dialog.dart';
 
 class QuestionnairesScreen extends ConsumerStatefulWidget {
-  const QuestionnairesScreen({super.key});
+  final bool collectionMode;
+
+  const QuestionnairesScreen({super.key, this.collectionMode = false});
 
   @override
   ConsumerState<QuestionnairesScreen> createState() =>
@@ -172,7 +173,9 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Questionnaires & Instruments',
+                      widget.collectionMode
+                          ? 'Data Collection'
+                          : 'Questionnaires & Instruments',
                       style: GoogleFonts.poppins(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
@@ -181,7 +184,9 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Build survey instruments, Likert scales, tests, and interview guides',
+                      widget.collectionMode
+                          ? 'Choose a questionnaire to record participant responses'
+                          : 'Build survey instruments, Likert scales, tests, and interview guides',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         color: Colors.grey.shade600,
@@ -189,17 +194,18 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                     ),
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _showCreateDialog(context),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('New Questionnaire'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.kPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 14),
+                if (!widget.collectionMode)
+                  ElevatedButton.icon(
+                    onPressed: () => _showCreateDialog(context),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('New Questionnaire'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.kPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
+                    ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -224,175 +230,229 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
             Expanded(
               child: state.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : questionnaires.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.assignment_outlined,
-                                  size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No questionnaires found',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Design simple or complex questionnaires with drag-and-drop',
-                                style: GoogleFonts.poppins(
-                                    color: Colors.grey.shade500),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () => _showCreateDialog(context),
-                                child: const Text('Create Questionnaire'),
-                              ),
-                            ],
-                          ),
+                  : state.error != null
+                      ? _LoadError(
+                          message: state.error!,
+                          onRetry: () => ref
+                              .read(questionnairesProvider.notifier)
+                              .loadQuestionnaires(),
                         )
-                      : ListView.separated(
-                          itemCount: questionnaires.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 16),
-                          itemBuilder: (context, idx) {
-                            final q = questionnaires[idx];
-                            final projTitle = projectsMap[q.projectId] ??
-                                'Unassigned Project';
-
-                            return Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Row(
+                      : questionnaires.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF00897B)
-                                          .withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                      Icons.assignment_rounded,
-                                      color: Color(0xFF00897B),
+                                  Icon(Icons.assignment_outlined,
+                                      size: 64, color: Colors.grey.shade400),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No questionnaires found',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          q.title,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Project: $projTitle • Version ${q.version}',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Design simple or complex questionnaires with drag-and-drop',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.grey.shade500),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  if (!widget.collectionMode)
+                                    ElevatedButton(
+                                      onPressed: () =>
+                                          _showCreateDialog(context),
+                                      child: const Text('Create Questionnaire'),
                                     ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: q.isApproved
-                                          ? Colors.green.shade50
-                                          : Colors.orange.shade50,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: q.isApproved
-                                            ? Colors.green.shade300
-                                            : Colors.orange.shade300,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      q.isApproved
-                                          ? 'APPROVED'
-                                          : 'DRAFT / PENDING',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: q.isApproved
-                                            ? Colors.green.shade700
-                                            : Colors.orange.shade800,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  OutlinedButton.icon(
-                                    onPressed: () => showDialog(context:context,builder:(_)=>QuestionnaireShareDialog(questionnaire:q)),
-                                    icon: const Icon(
-                                        Icons.play_circle_outline_rounded,
-                                        size: 16),
-                                    label: const Text('Collect / Share'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () => context
-                                        .go('/questionnaires/${q.id}/builder'),
-                                    icon: const Icon(Icons.edit_rounded,
-                                        size: 16),
-                                    label: const Text('Edit Questions'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.kPrimary,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_vert),
-                                    onSelected: (val) {
-                                      if (val == 'dup') {
-                                        ref
-                                            .read(
-                                                questionnairesProvider.notifier)
-                                            .duplicateQuestionnaire(q.id);
-                                      } else if (val == 'del') {
-                                        ref
-                                            .read(
-                                                questionnairesProvider.notifier)
-                                            .deleteQuestionnaire(q.id);
-                                      }
-                                    },
-                                    itemBuilder: (_) => [
-                                      const PopupMenuItem(
-                                          value: 'dup',
-                                          child: Text('Duplicate')),
-                                      const PopupMenuItem(
-                                          value: 'del',
-                                          child: Text('Delete',
-                                              style: TextStyle(
-                                                  color: Colors.red))),
-                                    ],
-                                  ),
                                 ],
                               ),
-                            );
-                          },
-                        ),
+                            )
+                          : ListView.separated(
+                              itemCount: questionnaires.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 16),
+                              itemBuilder: (context, idx) {
+                                final q = questionnaires[idx];
+                                final projTitle = projectsMap[q.projectId] ??
+                                    'Unassigned Project';
+
+                                return Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border:
+                                        Border.all(color: Colors.grey.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF00897B)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.assignment_rounded,
+                                          color: Color(0xFF00897B),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              q.title,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF1E293B),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Project: $projTitle • Version ${q.version}',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: q.isApproved
+                                              ? Colors.green.shade50
+                                              : Colors.orange.shade50,
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: q.isApproved
+                                                ? Colors.green.shade300
+                                                : Colors.orange.shade300,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          q.isApproved
+                                              ? 'APPROVED'
+                                              : 'DRAFT / PENDING',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: q.isApproved
+                                                ? Colors.green.shade700
+                                                : Colors.orange.shade800,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      OutlinedButton.icon(
+                                        onPressed: () => widget.collectionMode
+                                            ? context
+                                                .go('/data-collection/${q.id}')
+                                            : showDialog(
+                                                context: context,
+                                                builder: (_) =>
+                                                    QuestionnaireShareDialog(
+                                                        questionnaire: q)),
+                                        icon: const Icon(
+                                            Icons.play_circle_outline_rounded,
+                                            size: 16),
+                                        label: Text(widget.collectionMode
+                                            ? 'Start Collection'
+                                            : 'Collect / Share'),
+                                      ),
+                                      if (!widget.collectionMode) ...[
+                                        const SizedBox(width: 8),
+                                        ElevatedButton.icon(
+                                          onPressed: () => context.go(
+                                              '/questionnaires/${q.id}/builder'),
+                                          icon: const Icon(Icons.edit_rounded,
+                                              size: 16),
+                                          label: const Text('Edit Questions'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.kPrimary,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(Icons.more_vert),
+                                          onSelected: (val) {
+                                            if (val == 'dup') {
+                                              ref
+                                                  .read(questionnairesProvider
+                                                      .notifier)
+                                                  .duplicateQuestionnaire(q.id);
+                                            } else if (val == 'del') {
+                                              ref
+                                                  .read(questionnairesProvider
+                                                      .notifier)
+                                                  .deleteQuestionnaire(q.id);
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            const PopupMenuItem(
+                                                value: 'dup',
+                                                child: Text('Duplicate')),
+                                            const PopupMenuItem(
+                                                value: 'del',
+                                                child: Text('Delete',
+                                                    style: TextStyle(
+                                                        color: Colors.red))),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 52, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text('Questionnaires could not be loaded',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
 }

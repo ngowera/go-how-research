@@ -16,12 +16,14 @@ class SyncState {
   final SyncStateStatus status;
   final String? message;
   final DateTime? lastSyncTime;
+  final DateTime? lastAttemptTime;
   final int pendingCount;
 
   const SyncState({
     this.status = SyncStateStatus.idle,
     this.message,
     this.lastSyncTime,
+    this.lastAttemptTime,
     this.pendingCount = 0,
   });
 
@@ -29,12 +31,14 @@ class SyncState {
     SyncStateStatus? status,
     String? message,
     DateTime? lastSyncTime,
+    DateTime? lastAttemptTime,
     int? pendingCount,
   }) {
     return SyncState(
       status: status ?? this.status,
       message: message ?? this.message,
       lastSyncTime: lastSyncTime ?? this.lastSyncTime,
+      lastAttemptTime: lastAttemptTime ?? this.lastAttemptTime,
       pendingCount: pendingCount ?? this.pendingCount,
     );
   }
@@ -122,6 +126,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
         return;
       }
       var failures = 0;
+      final failureDetails = <String>[];
+      void recordFailure(String group, Object error) {
+        failures++;
+        if (failureDetails.length >= 3) return;
+        failureDetails.add('$group: ${_safeSyncError(error)}');
+      }
+
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('pending_profile_${authUser.id}') == true) {
         final localUser = await _db.getCurrentUser();
@@ -133,8 +144,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
               'institution_id': localUser.institutionId
             }).eq('id', authUser.id);
             await prefs.remove('pending_profile_${authUser.id}');
-          } catch (_) {
-            failures++;
+          } catch (error) {
+            recordFailure('Profile', error);
           }
         }
       }
@@ -151,7 +162,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final pendingDeletions = await _db.getPendingDeletions();
       for (final deletion in pendingDeletions) {
         if (!deletableTables.contains(deletion.entityType)) {
-          failures++;
+          recordFailure(
+              'Deletion', StateError('Unsupported local record type'));
           continue;
         }
         try {
@@ -163,8 +175,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
             deletion.entityType,
             deletion.entityId,
           );
-        } catch (_) {
-          failures++;
+        } catch (error) {
+          recordFailure('Delete ${deletion.entityType}', error);
         }
       }
 
@@ -174,8 +186,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
         try {
           await supabase.from('projects').upsert(project.toJson());
           await _db.markProjectSynced(project.id);
-        } catch (_) {
-          failures++;
+        } catch (error) {
+          recordFailure('Project "${project.title}"', error);
         }
       }
 
@@ -183,6 +195,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final pendingQuestionnaires = await _db.getPendingQuestionnaires();
       for (final q in pendingQuestionnaires) {
         try {
+          await _db.normalizeQuestionOrder(q.id);
           await supabase.from('questionnaires').upsert(q.toJson());
           final questions = await _db.getQuestions(questionnaireId: q.id);
           if (questions.isNotEmpty) {
@@ -191,8 +204,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
                 );
           }
           await _db.markQuestionnaireSynced(q.id);
-        } catch (_) {
-          failures++;
+        } catch (error) {
+          recordFailure('Questionnaire "${q.title}"', error);
         }
       }
 
@@ -202,8 +215,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
         try {
           await supabase.from('responses').upsert(r.toJson());
           await _db.markResponseSynced(r.id);
-        } catch (_) {
-          failures++;
+        } catch (error) {
+          recordFailure('Response', error);
         }
       }
 
@@ -213,15 +226,15 @@ class SyncNotifier extends StateNotifier<SyncState> {
         try {
           await supabase.from('participants').upsert(part.toJson());
           await _db.markParticipantSynced(part.id);
-        } catch (_) {
-          failures++;
+        } catch (error) {
+          recordFailure('Participant', error);
         }
       }
 
       try {
         await uploadInterviewDrafts(_db, supabase);
-      } catch (_) {
-        failures++;
+      } catch (error) {
+        recordFailure('Interview', error);
       }
 
       // Pull the authenticated user's server copy after every successful push.
@@ -236,15 +249,35 @@ class SyncNotifier extends StateNotifier<SyncState> {
         status: failures == 0 ? SyncStateStatus.success : SyncStateStatus.error,
         message: failures == 0
             ? 'Sync completed'
-            : '$failures record groups could not be synced',
+            : '$failures record groups could not be synced. ${failureDetails.join(' | ')}',
         lastSyncTime: failures == 0 ? DateTime.now() : state.lastSyncTime,
+        lastAttemptTime: DateTime.now(),
       );
     } catch (e) {
       state = state.copyWith(
         status: SyncStateStatus.error,
-        message: 'Sync error: $e',
+        message: 'Sync error: ${_safeSyncError(e)}',
+        lastAttemptTime: DateTime.now(),
       );
     }
+  }
+
+  String _safeSyncError(Object error) {
+    if (error is PostgrestException) {
+      final parts = <String>[
+        error.message,
+        if (error.code != null && error.code!.isNotEmpty) 'code ${error.code}',
+        if (error.details != null && '${error.details}'.trim().isNotEmpty)
+          '${error.details}',
+        if (error.hint != null && '${error.hint}'.trim().isNotEmpty)
+          'Hint: ${error.hint}',
+      ];
+      return parts.join(' — ');
+    }
+    final text = error
+        .toString()
+        .replaceFirst(RegExp(r'^(Exception|StateError):\\s*'), '');
+    return text.length <= 300 ? text : '${text.substring(0, 300)}…';
   }
 
   Future<void> _pullCloudData(SupabaseClient supabase, String userId) async {
@@ -314,8 +347,12 @@ class SyncNotifier extends StateNotifier<SyncState> {
       SupabaseClient client, String table, String column, String value) async {
     final rows = <Map<String, dynamic>>[];
     for (var offset = 0;; offset += 1000) {
-      final page = await client.from(table).select().eq(column, value)
-          .order('id').range(offset, offset + 999);
+      final page = await client
+          .from(table)
+          .select()
+          .eq(column, value)
+          .order('id')
+          .range(offset, offset + 999);
       rows.addAll(page);
       if (page.length < 1000) return rows;
     }

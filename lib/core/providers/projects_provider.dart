@@ -38,7 +38,7 @@ class ProjectsNotifier extends StateNotifier<ProjectsState> {
   ProjectsNotifier(this._db, this._ref) : super(const ProjectsState()) {
     loadProjects();
     _ref.listen<DateTime?>(
-      syncProvider.select((sync) => sync.lastSyncTime),
+      syncProvider.select((sync) => sync.lastAttemptTime),
       (previous, next) {
         if (next != null && next != previous) loadProjects();
       },

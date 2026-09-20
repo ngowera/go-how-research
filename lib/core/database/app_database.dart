@@ -254,9 +254,12 @@ class AppDatabase extends _$AppDatabase {
             ..where((member) => member.userId.equals(user.id)))
           .get();
       final sharedIds = memberships.map((member) => member.projectId).toList();
-      query.where((p) => p.ownerId.equals(user.id) |
+      query.where((p) =>
+          p.ownerId.equals(user.id) |
           p.supervisorId.equals(user.id) |
-          (sharedIds.isNotEmpty ? p.id.isIn(sharedIds) : const Constant(false)));
+          (sharedIds.isNotEmpty
+              ? p.id.isIn(sharedIds)
+              : const Constant(false)));
     }
     if (ownerId != null) {
       query.where((p) => p.ownerId.equals(ownerId));
@@ -271,12 +274,12 @@ class AppDatabase extends _$AppDatabase {
     required String projectRole,
   }) async {
     await into(projectMembers).insertOnConflictUpdate(
-          ProjectMembersCompanion.insert(
-            projectId: projectId,
-            userId: userId,
-            projectRole: projectRole,
-          ),
-        );
+      ProjectMembersCompanion.insert(
+        projectId: projectId,
+        userId: userId,
+        projectRole: projectRole,
+      ),
+    );
   }
 
   Future<String?> getProjectMembershipRole(String projectId) async {
@@ -415,13 +418,33 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<m.Question>> getQuestions(
       {required String questionnaireId}) async {
-    if (!(await getQuestionnaires()).any((q) => q.id == questionnaireId))
+    if (!(await getQuestionnaires()).any((q) => q.id == questionnaireId)) {
       return [];
+    }
     final rows = await (select(questions)
           ..where((q) => q.questionnaireId.equals(questionnaireId))
           ..orderBy([(q) => OrderingTerm.asc(q.orderIndex)]))
         .get();
     return rows.map(_questionFromRow).toList();
+  }
+
+  /// Repairs gaps or duplicate positions left by older questionnaire edits.
+  /// Supabase enforces one order position per questionnaire, while the local
+  /// offline database intentionally remains permissive during editing.
+  Future<void> normalizeQuestionOrder(String questionnaireId) async {
+    final rows = await (select(questions)
+          ..where((q) => q.questionnaireId.equals(questionnaireId))
+          ..orderBy([
+            (q) => OrderingTerm.asc(q.orderIndex),
+            (q) => OrderingTerm.asc(q.id),
+          ]))
+        .get();
+    await transaction(() async {
+      for (var index = 0; index < rows.length; index++) {
+        await (update(questions)..where((q) => q.id.equals(rows[index].id)))
+            .write(QuestionsCompanion(orderIndex: Value(index + 1)));
+      }
+    });
   }
 
   Future<void> deleteQuestion(String id) async {

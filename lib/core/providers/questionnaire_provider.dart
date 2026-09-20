@@ -39,7 +39,7 @@ class QuestionnairesNotifier extends StateNotifier<QuestionnairesState> {
       : super(const QuestionnairesState()) {
     loadQuestionnaires();
     _ref.listen<DateTime?>(
-      syncProvider.select((sync) => sync.lastSyncTime),
+      syncProvider.select((sync) => sync.lastAttemptTime),
       (previous, next) {
         if (next != null && next != previous) loadQuestionnaires();
       },
@@ -210,7 +210,7 @@ class QuestionsNotifier extends StateNotifier<List<Question>> {
   QuestionsNotifier(this._db, this._ref, this.questionnaireId) : super([]) {
     loadQuestions();
     _ref.listen<DateTime?>(
-      syncProvider.select((sync) => sync.lastSyncTime),
+      syncProvider.select((sync) => sync.lastAttemptTime),
       (previous, next) {
         if (next != null && next != previous) loadQuestions();
       },
@@ -250,6 +250,7 @@ class QuestionsNotifier extends StateNotifier<List<Question>> {
 
   Future<void> deleteQuestion(String id) async {
     await _db.deleteQuestion(id);
+    await _db.normalizeQuestionOrder(questionnaireId);
     await _markInstrumentPending();
     await loadQuestions();
   }

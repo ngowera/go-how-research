@@ -104,9 +104,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (BuildContext context, GoRouterState state) async {
       // Global redirects may not yet have a matched route name.
       final segments = state.uri.pathSegments;
-      const privateRoots = {'login','register','dashboard','projects',
-        'questionnaires','participants','supervisor','reports','settings',
-        'interviews','analytics','data','data-collection'};
+      const privateRoots = {
+        'login',
+        'register',
+        'dashboard',
+        'projects',
+        'questionnaires',
+        'participants',
+        'supervisor',
+        'reports',
+        'settings',
+        'interviews',
+        'analytics',
+        'data',
+        'data-collection'
+      };
       if (segments.length == 1 &&
           !privateRoots.contains(segments.first) &&
           RegExp(r'^[a-z0-9][a-z0-9-]{5,59}$').hasMatch(segments.first)) {
@@ -227,7 +239,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             name: 'data-collection',
             builder: (context, state) =>
                 state.pathParameters['questionnaireId'] == 'default'
-                    ? const QuestionnairesScreen()
+                    ? const QuestionnairesScreen(collectionMode: true)
                     : DataCollectionScreen(
                         questionnaireId:
                             state.pathParameters['questionnaireId']!,
@@ -295,7 +307,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/:surveySlug',
         name: 'public-questionnaire',
-        builder: (context,state)=>PublicQuestionnaireScreen(slug:state.pathParameters['surveySlug']!),
+        builder: (context, state) => PublicQuestionnaireScreen(
+            slug: state.pathParameters['surveySlug']!),
       ),
     ],
 

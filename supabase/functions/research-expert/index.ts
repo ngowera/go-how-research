@@ -88,7 +88,35 @@ Deno.serve(async (req: Request) => {
         generationConfig:{temperature:0.2,maxOutputTokens:3000},
       }),
     });
-    if(!result.ok) return json({error:result.status===429?'Gemini quota reached. Please try again later.':'Gemini could not answer. Check the server API key and GEMINI_MODEL setting.'},502);
+    if(!result.ok) {
+      let providerMessage = '';
+      let providerStatus = '';
+      try {
+        const providerError = await result.json();
+        providerMessage = String(providerError?.error?.message ?? '');
+        providerStatus = String(providerError?.error?.status ?? '');
+      } catch (_) {
+        // The upstream body is intentionally not returned verbatim.
+      }
+      console.error('Gemini request failed', {
+        httpStatus: result.status,
+        providerStatus,
+        message: providerMessage.slice(0, 500),
+        model,
+      });
+      const normalized = `${providerStatus} ${providerMessage}`.toLowerCase();
+      let clientMessage = 'Gemini could not answer. Check the function logs for the provider error.';
+      if (result.status === 429) {
+        clientMessage = 'Gemini quota was reached. Check billing/quota or try again later.';
+      } else if (result.status === 401 || result.status === 403 || normalized.includes('api key')) {
+        clientMessage = 'The Gemini API key is invalid or is not allowed to use this API. Update the GEMINI_API_KEY Supabase secret.';
+      } else if (result.status === 404 || normalized.includes('not found') || normalized.includes('not supported')) {
+        clientMessage = `The configured Gemini model (${model}) is unavailable. Update the GEMINI_MODEL Supabase secret.`;
+      } else if (normalized.includes('billing')) {
+        clientMessage = 'Gemini billing is not enabled for this API key.';
+      }
+      return json({error:clientMessage},502);
+    }
     const output=await result.json();
     const answer=output.candidates?.[0]?.content?.parts?.filter((p:any)=>!p.thought && p.text).map((p:any)=>p.text).join('\n');
     if(!answer) return json({error:'No answer was returned. Rephrase your question and try again.'},502);
