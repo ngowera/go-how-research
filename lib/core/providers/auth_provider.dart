@@ -47,7 +47,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (_cloudConfigured()) {
         final cloudUser = Supabase.instance.client.auth.currentUser;
         if (cloudUser != null) {
-          if (localUser == null || localUser.id != cloudUser.id ||
+          if (localUser == null ||
+              localUser.id != cloudUser.id ||
               prefs.getBool('pending_profile_${cloudUser.id}') != true) {
             localUser = await _loadCloudProfile(cloudUser);
           }

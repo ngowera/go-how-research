@@ -213,6 +213,12 @@ class _QuestionnaireBuilderScreenState
                         () => _addQuestion(QuestionType.yesNo),
                       ),
                       _buildPaletteButton(
+                        'Thumbs Up / Down',
+                        Icons.thumb_up_alt_rounded,
+                        const Color(0xFF6D4C41),
+                        () => _addQuestion(QuestionType.thumbs),
+                      ),
+                      _buildPaletteButton(
                         'Date Picker',
                         Icons.calendar_today_rounded,
                         const Color(0xFF0288D1),
@@ -670,14 +676,20 @@ class _QuestionnaireBuilderScreenState
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: const [
-                    Text('1 = Strongly Disagree',
-                        style: TextStyle(fontSize: 11)),
-                    Text('2 = Disagree', style: TextStyle(fontSize: 11)),
-                    Text('3 = Neutral', style: TextStyle(fontSize: 11)),
-                    Text('4 = Agree', style: TextStyle(fontSize: 11)),
-                    Text('5 = Strongly Agree', style: TextStyle(fontSize: 11)),
-                  ],
+                  children: List.generate(5, (index) {
+                    const defaults = [
+                      'Strongly disagree',
+                      'Disagree',
+                      'Neutral',
+                      'Agree',
+                      'Strongly agree'
+                    ];
+                    final label = q.options.length == 5
+                        ? q.options[index]
+                        : defaults[index];
+                    return Text('${index + 1} = $label',
+                        style: const TextStyle(fontSize: 11));
+                  }),
                 ),
               ),
 
@@ -687,6 +699,19 @@ class _QuestionnaireBuilderScreenState
                   OutlinedButton(onPressed: null, child: const Text('YES')),
                   const SizedBox(width: 8),
                   OutlinedButton(onPressed: null, child: const Text('NO')),
+                ],
+              ),
+
+            if (q.type == QuestionType.thumbs)
+              const Row(
+                children: [
+                  Icon(Icons.thumb_up_alt_rounded, color: Color(0xFF2E7D32)),
+                  SizedBox(width: 8),
+                  Text('Like'),
+                  SizedBox(width: 24),
+                  Icon(Icons.thumb_down_alt_rounded, color: Color(0xFFC62828)),
+                  SizedBox(width: 8),
+                  Text('Dislike'),
                 ],
               ),
 

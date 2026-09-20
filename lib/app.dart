@@ -23,7 +23,7 @@ class GoHowResearchApp extends ConsumerWidget {
             ? VisualDensity.compact
             : VisualDensity.standard,
       ),
-        builder: (context, child) => child!,
+      builder: (context, child) => child!,
       routerConfig: router,
     );
   }

@@ -1,4 +1,6 @@
 // lib/shared/widgets/app_shell.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -63,13 +65,7 @@ const List<_NavItem> _navItems = [
     route: '/projects',
   ),
   _NavItem(
-    label: 'Questionnaires',
-    icon: Icons.assignment_outlined,
-    activeIcon: Icons.assignment_rounded,
-    route: '/questionnaires',
-  ),
-  _NavItem(
-    label: 'Data Collection',
+    label: 'Questionnaires & Data',
     icon: Icons.edit_note_outlined,
     activeIcon: Icons.edit_note_rounded,
     route: '/data-collection/default',
@@ -123,6 +119,11 @@ class AppShell extends ConsumerWidget {
   /// Determine the selected index from the current route location.
   int _selectedIndex(BuildContext context) {
     final loc = GoRouterState.of(context).matchedLocation;
+    if (loc.startsWith('/questionnaires')) {
+      return _navItems.indexWhere(
+        (item) => item.route == '/data-collection/default',
+      );
+    }
     for (int i = 0; i < _navItems.length; i++) {
       final base = _navItems[i].route.split('/:').first.split('/default').first;
       if (loc.startsWith(base) && base.length > 1) return i;
@@ -244,56 +245,176 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-class CollaborationNotificationBell extends StatelessWidget {
+class CollaborationNotificationBell extends ConsumerStatefulWidget {
   const CollaborationNotificationBell({super.key});
 
-  Future<List<ProjectAccessRequest>> _requests() {
-    return ProjectCollaborationService().incomingRequests();
+  @override
+  ConsumerState<CollaborationNotificationBell> createState() =>
+      _CollaborationNotificationBellState();
+}
+
+class _CollaborationNotificationBellState
+    extends ConsumerState<CollaborationNotificationBell> {
+  final _service = ProjectCollaborationService();
+  StreamSubscription<List<ProjectNotification>>? _notificationSubscription;
+  List<ProjectNotification> _notifications = const [];
+  List<ProjectAccessRequest> _requests = const [];
+  Set<String> _knownNotificationIds = const {};
+  bool _hasInitialSnapshot = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startListening();
   }
 
-  void _showRequests(BuildContext context) {
+  Future<void> _startListening() async {
+    await _notificationSubscription?.cancel();
+    _hasInitialSnapshot = false;
+    _knownNotificationIds = const {};
+    try {
+      _requests = await _service.incomingRequests();
+      _notificationSubscription = _service.watchNotifications().listen(
+        (notifications) {
+          final ids = notifications.map((notice) => notice.id).toSet();
+          final hasNewSubmission = _hasInitialSnapshot &&
+              notifications.any((notice) =>
+                  notice.kind == 'questionnaire_submission' &&
+                  !_knownNotificationIds.contains(notice.id));
+          _knownNotificationIds = ids;
+          _hasInitialSnapshot = true;
+          if (mounted) setState(() => _notifications = notifications);
+          if (hasNewSubmission) {
+            // The notification is committed in the same database transaction
+            // as the participant and answers, so this pull is never premature.
+            ref.read(sync.syncProvider.notifier).syncAll();
+          }
+        },
+        onError: (_) {},
+      );
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Offline/local-only operation remains fully supported.
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
+  }
+
+  String _relativeTime(DateTime time) {
+    final difference = DateTime.now().difference(time.toLocal());
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inHours < 1) return '${difference.inMinutes}m ago';
+    if (difference.inDays < 1) return '${difference.inHours}h ago';
+    return '${difference.inDays}d ago';
+  }
+
+  void _showNotifications(BuildContext context) {
+    final unreadIds = _notifications
+        .where((notice) => notice.isUnread)
+        .map((notice) => notice.id)
+        .toList(growable: false);
     showModalBottomSheet<void>(
       context: context,
+      backgroundColor: const Color(0xFFFFF8F2),
+      barrierColor: const Color(0xFF2A160F).withValues(alpha: 0.30),
       showDragHandle: true,
       builder: (context) => SafeArea(
-        child: FutureBuilder<List<ProjectAccessRequest>>(
-          future: _requests(),
-          builder: (context, snapshot) {
-            final requests = snapshot.data ?? const <ProjectAccessRequest>[];
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(
-                height: 160,
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Collaboration requests',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  if (requests.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text('No pending join requests.'),
-                    )
-                  else
-                    ...requests.map(
-                      (request) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.person_add_alt_1_outlined),
-                        title: Text(request.requesterName),
-                        subtitle: Text(
-                          '${request.requesterEmail}\n${request.projectTitle} • ${request.requestedRole}',
-                        ),
-                        isThreeLine: true,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 620),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Color(0xFF4B2A1D),
+                      foregroundColor: Color(0xFFFFF4EA),
+                      child: Icon(Icons.notifications_active_outlined),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Research activity',
+                      style: TextStyle(
+                        color: Color(0xFF3B2118),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (_notifications.isEmpty && _requests.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: Center(
+                      child: Text(
+                        'No new research activity yet.',
+                        style: TextStyle(color: Color(0xFF795548)),
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        ..._notifications.map(
+                          (notice) => Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: notice.isUnread
+                                  ? const Color(0xFFFFE8D5)
+                                  : Colors.white.withValues(alpha: 0.72),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFB9896F)
+                                    .withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: Icon(
+                                notice.kind == 'questionnaire_submission'
+                                    ? Icons.assignment_turned_in_outlined
+                                    : Icons.notifications_none_rounded,
+                                color: const Color(0xFF6D3D2A),
+                              ),
+                              title: Text(
+                                notice.title,
+                                style: const TextStyle(
+                                  color: Color(0xFF3B2118),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${notice.body}\n${_relativeTime(notice.createdAt)}',
+                              ),
+                              isThreeLine: true,
+                            ),
+                          ),
+                        ),
+                        ..._requests.map(
+                          (request) => ListTile(
+                            leading: const Icon(
+                              Icons.person_add_alt_1_outlined,
+                              color: Color(0xFF6D3D2A),
+                            ),
+                            title: Text(request.requesterName),
+                            subtitle: Text(
+                              '${request.projectTitle} • ${request.requestedRole}',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_requests.isNotEmpty)
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -301,63 +422,66 @@ class CollaborationNotificationBell extends StatelessWidget {
                         Navigator.pop(context);
                         GoRouter.of(context).go('/settings');
                       },
-                      child: const Text('Open collaboration settings'),
+                      child: const Text('Manage collaboration'),
                     ),
                   ),
-                ],
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         ),
       ),
     );
+    if (unreadIds.isNotEmpty) {
+      _service.markNotificationsRead(unreadIds).catchError((_) {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<ProjectAccessRequest>>(
-      future: _requests(),
-      builder: (context, snapshot) {
-        final count = snapshot.data?.length ?? 0;
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              tooltip: 'Collaboration requests',
-              onPressed: () => _showRequests(context),
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                color: AppColors.kPrimary,
+    ref.listen<String?>(
+      currentUserProvider.select((user) => user?.id),
+      (previous, next) {
+        if (previous != next) _startListening();
+      },
+    );
+    final count = _notifications.where((notice) => notice.isUnread).length +
+        _requests.length;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          tooltip: 'Research activity',
+          onPressed: () => _showNotifications(context),
+          style: IconButton.styleFrom(
+            backgroundColor: const Color(0xFFFFF1E5),
+            foregroundColor: const Color(0xFF4B2A1D),
+          ),
+          icon: const Icon(Icons.notifications_none_rounded),
+        ),
+        if (count > 0)
+          Positioned(
+            top: 3,
+            right: 3,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFB94A2F),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
-            ),
-            if (count > 0)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  width: count > 1 ? 18 : 9,
-                  height: count > 1 ? 18 : 9,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                  child: count > 1
-                      ? Text(
-                          '$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
-                      : null,
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-          ],
-        );
-      },
+            ),
+          ),
+      ],
     );
   }
 }
@@ -489,9 +613,8 @@ class _NavTile extends StatelessWidget {
                     item.label,
                     style: GoogleFonts.poppins(
                       fontSize: 13,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
                       color: isSelected || useLightForeground
                           ? Colors.white
                           : const Color(0xFF6B7280),

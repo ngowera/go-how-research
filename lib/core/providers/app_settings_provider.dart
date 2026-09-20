@@ -142,8 +142,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> updateAppearance({int? accentColor, bool? compact}) async {
-    state = state.copyWith(
-        accentColor: accentColor, compactLayout: compact);
+    state = state.copyWith(accentColor: accentColor, compactLayout: compact);
     final p = await SharedPreferences.getInstance();
     await p.setInt('${_kPrefix}accent', state.accentColor);
     await p.setBool('${_kPrefix}compact', state.compactLayout);

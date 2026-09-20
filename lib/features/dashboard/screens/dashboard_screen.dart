@@ -218,49 +218,49 @@ class DashboardScreen extends ConsumerWidget {
                     itemCount: 6,
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (context, index) => [
-                    _buildActionTile(
-                      icon: Icons.add_circle_outline_rounded,
-                      label: 'New Project',
-                      color: const Color(0xFF1565C0),
-                      onTap: () => context.go('/projects'),
-                    ),
-                    _buildActionTile(
-                      icon: Icons.playlist_add_rounded,
-                      label: 'Build Questionnaire',
-                      color: const Color(0xFF00897B),
-                      onTap: () => context.go('/questionnaires'),
-                    ),
-                    _buildActionTile(
-                      icon: Icons.edit_note_rounded,
-                      label: 'Collect Data',
-                      color: const Color(0xFFF57C00),
-                      onTap: () => context.go('/questionnaires'),
-                    ),
-                    _buildActionTile(
-                      icon: Icons.bar_chart_rounded,
-                      label: 'View Analytics',
-                      color: const Color(0xFF7B1FA2),
-                      onTap: () {
-                        if (projectsState.projects.isNotEmpty) {
-                          context.go(
-                              '/analytics/${projectsState.projects.first.id}');
-                        } else {
-                          context.go('/projects');
-                        }
-                      },
-                    ),
-                    _buildActionTile(
-                      icon: Icons.person_add_outlined,
-                      label: 'Participants',
-                      color: const Color(0xFF2E7D32),
-                      onTap: () => context.go('/participants'),
-                    ),
-                    _buildActionTile(
-                      icon: Icons.picture_as_pdf_outlined,
-                      label: 'Reports',
-                      color: const Color(0xFFC62828),
-                      onTap: () => context.go('/reports'),
-                    ),
+                      _buildActionTile(
+                        icon: Icons.add_circle_outline_rounded,
+                        label: 'New Project',
+                        color: const Color(0xFF1565C0),
+                        onTap: () => context.go('/projects'),
+                      ),
+                      _buildActionTile(
+                        icon: Icons.playlist_add_rounded,
+                        label: 'Build Questionnaire',
+                        color: const Color(0xFF00897B),
+                        onTap: () => context.go('/questionnaires'),
+                      ),
+                      _buildActionTile(
+                        icon: Icons.edit_note_rounded,
+                        label: 'Collect Data',
+                        color: const Color(0xFFF57C00),
+                        onTap: () => context.go('/data-collection/default'),
+                      ),
+                      _buildActionTile(
+                        icon: Icons.bar_chart_rounded,
+                        label: 'View Analytics',
+                        color: const Color(0xFF7B1FA2),
+                        onTap: () {
+                          if (projectsState.projects.isNotEmpty) {
+                            context.go(
+                                '/analytics/${projectsState.projects.first.id}');
+                          } else {
+                            context.go('/projects');
+                          }
+                        },
+                      ),
+                      _buildActionTile(
+                        icon: Icons.person_add_outlined,
+                        label: 'Participants',
+                        color: const Color(0xFF2E7D32),
+                        onTap: () => context.go('/participants'),
+                      ),
+                      _buildActionTile(
+                        icon: Icons.picture_as_pdf_outlined,
+                        label: 'Reports',
+                        color: const Color(0xFFC62828),
+                        onTap: () => context.go('/reports'),
+                      ),
                     ][index],
                   ),
                 ),

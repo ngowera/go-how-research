@@ -20,6 +20,30 @@ class QuestionnairesScreen extends ConsumerStatefulWidget {
 
 class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
   String _search = '';
+  late bool _collectionMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _collectionMode = widget.collectionMode;
+  }
+
+  @override
+  void didUpdateWidget(covariant QuestionnairesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.collectionMode != widget.collectionMode) {
+      _collectionMode = widget.collectionMode;
+    }
+  }
+
+  void _selectWorkspace(bool collect) {
+    setState(() => _collectionMode = collect);
+    if (collect) {
+      context.go('/data-collection/default');
+    } else {
+      context.go('/questionnaires');
+    }
+  }
 
   void _showCreateDialog(BuildContext context) {
     final projectsState = ref.read(projectsProvider);
@@ -173,9 +197,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.collectionMode
-                          ? 'Data Collection'
-                          : 'Questionnaires & Instruments',
+                      'Questionnaires & Data Collection',
                       style: GoogleFonts.poppins(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
@@ -184,7 +206,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      widget.collectionMode
+                      _collectionMode
                           ? 'Choose a questionnaire to record participant responses'
                           : 'Build survey instruments, Likert scales, tests, and interview guides',
                       style: GoogleFonts.poppins(
@@ -194,7 +216,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                     ),
                   ],
                 ),
-                if (!widget.collectionMode)
+                if (!_collectionMode)
                   ElevatedButton.icon(
                     onPressed: () => _showCreateDialog(context),
                     icon: const Icon(Icons.add_rounded),
@@ -209,6 +231,23 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
               ],
             ),
             const SizedBox(height: 24),
+
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _workspaceTab(false, Icons.assignment_outlined,
+                      'Questionnaire Builder'),
+                  _workspaceTab(true, Icons.edit_note_rounded, 'Collect Data'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // Search bar
             TextField(
@@ -260,7 +299,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                                         color: Colors.grey.shade500),
                                   ),
                                   const SizedBox(height: 16),
-                                  if (!widget.collectionMode)
+                                  if (!_collectionMode)
                                     ElevatedButton(
                                       onPressed: () =>
                                           _showCreateDialog(context),
@@ -357,7 +396,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                                       ),
                                       const SizedBox(width: 16),
                                       OutlinedButton.icon(
-                                        onPressed: () => widget.collectionMode
+                                        onPressed: () => _collectionMode
                                             ? context
                                                 .go('/data-collection/${q.id}')
                                             : showDialog(
@@ -368,11 +407,11 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                                         icon: const Icon(
                                             Icons.play_circle_outline_rounded,
                                             size: 16),
-                                        label: Text(widget.collectionMode
+                                        label: Text(_collectionMode
                                             ? 'Start Collection'
                                             : 'Collect / Share'),
                                       ),
-                                      if (!widget.collectionMode) ...[
+                                      if (!_collectionMode) ...[
                                         const SizedBox(width: 8),
                                         ElevatedButton.icon(
                                           onPressed: () => context.go(
@@ -421,6 +460,35 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _workspaceTab(bool collection, IconData icon, String label) {
+    final selected = _collectionMode == collection;
+    return InkWell(
+      onTap: () => _selectWorkspace(collection),
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: selected
+              ? const [BoxShadow(color: Color(0x14000000), blurRadius: 8)]
+              : null,
+        ),
+        child: Row(children: [
+          Icon(icon,
+              size: 19,
+              color: selected ? AppTheme.kPrimary : Colors.grey.shade600),
+          const SizedBox(width: 8),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? AppTheme.kPrimary : Colors.grey.shade700)),
+        ]),
       ),
     );
   }

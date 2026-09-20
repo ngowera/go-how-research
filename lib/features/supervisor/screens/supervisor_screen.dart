@@ -42,183 +42,188 @@ class SupervisorScreen extends ConsumerWidget {
                         ],
                       )
                     : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(child: _buildHeaderTitle()),
-                _buildRoleBadge(user),
-              ],
-            ),
-            const SizedBox(height: 28),
-
-            // Overview cards
-            isPhone
-                ? Column(
-                    children: [
-                      _buildCountCard(
-                        title: 'Supervised Projects',
-                        count: '${projectsState.projects.length}',
-                        icon: Icons.folder_special_rounded,
-                        color: const Color(0xFF1565C0),
-                        bg: const Color(0xFFE3F2FD),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildCountCard(
-                        title: 'Pending Review',
-                        count: '${pendingQuestionnaires.length}',
-                        icon: Icons.pending_actions_rounded,
-                        color: const Color(0xFFF57C00),
-                        bg: const Color(0xFFFFF3E0),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildCountCard(
-                        title: 'Approved Instruments',
-                        count: '${approvedQuestionnaires.length}',
-                        icon: Icons.verified_rounded,
-                        color: const Color(0xFF2E7D32),
-                        bg: const Color(0xFFE8F5E9),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                Expanded(
-                  child: _buildCountCard(
-                    title: 'Supervised Projects',
-                    count: '${projectsState.projects.length}',
-                    icon: Icons.folder_special_rounded,
-                    color: const Color(0xFF1565C0),
-                    bg: const Color(0xFFE3F2FD),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildCountCard(
-                    title: 'Pending Review',
-                    count: '${pendingQuestionnaires.length}',
-                    icon: Icons.pending_actions_rounded,
-                    color: const Color(0xFFF57C00),
-                    bg: const Color(0xFFFFF3E0),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildCountCard(
-                    title: 'Approved Instruments',
-                    count: '${approvedQuestionnaires.length}',
-                    icon: Icons.verified_rounded,
-                    color: const Color(0xFF2E7D32),
-                    bg: const Color(0xFFE8F5E9),
-                  ),
-                ),
-                    ],
-                  ),
-            const SizedBox(height: 32),
-
-            // Pending Approvals Section
-            Text(
-              'Instruments Awaiting Supervisor Approval',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            Expanded(
-              child: pendingQuestionnaires.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.thumb_up_alt_outlined,
-                              size: 56, color: Colors.green.shade300),
+                          Flexible(child: _buildHeaderTitle()),
+                          _buildRoleBadge(user),
+                        ],
+                      ),
+                const SizedBox(height: 28),
+
+                // Overview cards
+                isPhone
+                    ? Column(
+                        children: [
+                          _buildCountCard(
+                            title: 'Supervised Projects',
+                            count: '${projectsState.projects.length}',
+                            icon: Icons.folder_special_rounded,
+                            color: const Color(0xFF1565C0),
+                            bg: const Color(0xFFE3F2FD),
+                          ),
                           const SizedBox(height: 12),
-                          Text(
-                            'All questionnaires reviewed & approved!',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
+                          _buildCountCard(
+                            title: 'Pending Review',
+                            count: '${pendingQuestionnaires.length}',
+                            icon: Icons.pending_actions_rounded,
+                            color: const Color(0xFFF57C00),
+                            bg: const Color(0xFFFFF3E0),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildCountCard(
+                            title: 'Approved Instruments',
+                            count: '${approvedQuestionnaires.length}',
+                            icon: Icons.verified_rounded,
+                            color: const Color(0xFF2E7D32),
+                            bg: const Color(0xFFE8F5E9),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: _buildCountCard(
+                              title: 'Supervised Projects',
+                              count: '${projectsState.projects.length}',
+                              icon: Icons.folder_special_rounded,
+                              color: const Color(0xFF1565C0),
+                              bg: const Color(0xFFE3F2FD),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'No pending instruments currently require supervisor sign-off.',
-                            style: GoogleFonts.poppins(
-                                color: Colors.grey.shade500, fontSize: 13),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildCountCard(
+                              title: 'Pending Review',
+                              count: '${pendingQuestionnaires.length}',
+                              icon: Icons.pending_actions_rounded,
+                              color: const Color(0xFFF57C00),
+                              bg: const Color(0xFFFFF3E0),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildCountCard(
+                              title: 'Approved Instruments',
+                              count: '${approvedQuestionnaires.length}',
+                              icon: Icons.verified_rounded,
+                              color: const Color(0xFF2E7D32),
+                              bg: const Color(0xFFE8F5E9),
+                            ),
                           ),
                         ],
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: pendingQuestionnaires.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, idx) {
-                        final q = pendingQuestionnaires[idx];
-                        return Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: isPhone
-                              ? Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    _buildApprovalIcon(),
-                                    const SizedBox(height: 12),
-                                    _buildApprovalDetails(q),
-                                    const SizedBox(height: 12),
-                                    _buildApprovalActions(context, ref, q),
-                                  ],
-                                )
-                              : Row(
-                                  children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.assignment_late_rounded,
-                                  color: Color(0xFFF57C00),
+                const SizedBox(height: 32),
+
+                // Pending Approvals Section
+                Text(
+                  'Instruments Awaiting Supervisor Approval',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                Expanded(
+                  child: pendingQuestionnaires.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.thumb_up_alt_outlined,
+                                  size: 56, color: Colors.green.shade300),
+                              const SizedBox(height: 12),
+                              Text(
+                                'All questionnaires reviewed & approved!',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      q.title,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF1E293B),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Version ${q.version} • Submitted for validation • ${q.description}',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'No pending instruments currently require supervisor sign-off.',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.grey.shade500, fontSize: 13),
                               ),
-                              _buildApprovalActions(context, ref, q),
                             ],
                           ),
-                        );
-                      },
-                    ),
-            ),
+                        )
+                      : ListView.separated(
+                          itemCount: pendingQuestionnaires.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, idx) {
+                            final q = pendingQuestionnaires[idx];
+                            return Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: isPhone
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildApprovalIcon(),
+                                        const SizedBox(height: 12),
+                                        _buildApprovalDetails(q),
+                                        const SizedBox(height: 12),
+                                        _buildApprovalActions(context, ref, q),
+                                      ],
+                                    )
+                                  : Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade50,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(
+                                            Icons.assignment_late_rounded,
+                                            color: Color(0xFFF57C00),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                q.title,
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color:
+                                                      const Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Version ${q.version} • Submitted for validation • ${q.description}',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        _buildApprovalActions(context, ref, q),
+                                      ],
+                                    ),
+                            );
+                          },
+                        ),
+                ),
               ],
             ),
           );
@@ -319,8 +324,7 @@ class SupervisorScreen extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.school_rounded,
-              color: Color(0xFF7B1FA2), size: 18),
+          const Icon(Icons.school_rounded, color: Color(0xFF7B1FA2), size: 18),
           const SizedBox(width: 8),
           Text(
             'Role: ${user?.role.name.toUpperCase() ?? "SUPERVISOR"}',
@@ -342,8 +346,8 @@ class SupervisorScreen extends ConsumerWidget {
         color: Colors.orange.shade50,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(Icons.assignment_late_rounded,
-          color: Color(0xFFF57C00)),
+      child:
+          const Icon(Icons.assignment_late_rounded, color: Color(0xFFF57C00)),
     );
   }
 

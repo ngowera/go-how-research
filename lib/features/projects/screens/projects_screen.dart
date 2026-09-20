@@ -295,33 +295,49 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       ),
                       if (isOwner)
                         PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert_rounded, size: 18),
-                        onSelected: (val) {
-                          if (val == 'duplicate') {
-                            ref
-                                .read(projectsProvider.notifier)
-                                .duplicateProject(project.id);
-                          } else if (val == 'archive') {
-                            ref
-                                .read(projectsProvider.notifier)
-                                .archiveProject(project.id);
-                          } else if (val == 'delete') {
-                            ref
-                                .read(projectsProvider.notifier)
-                                .deleteProject(project.id);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(
-                              value: 'duplicate', child: Text('Duplicate')),
-                          const PopupMenuItem(
-                              value: 'archive', child: Text('Archive')),
-                          const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Delete',
-                                  style: TextStyle(color: Colors.red))),
-                        ],
-                      ),
+                          icon: const Icon(Icons.more_vert_rounded, size: 18),
+                          onSelected: (val) {
+                            if (val == 'duplicate') {
+                              ref
+                                  .read(projectsProvider.notifier)
+                                  .duplicateProject(project.id);
+                            } else if (val == 'complete') {
+                              ref.read(projectsProvider.notifier).updateProject(
+                                    project.copyWith(
+                                        status: ResearchStatus.completed),
+                                  );
+                            } else if (val == 'archive') {
+                              ref
+                                  .read(projectsProvider.notifier)
+                                  .archiveProject(project.id);
+                            } else if (val == 'delete') {
+                              ref
+                                  .read(projectsProvider.notifier)
+                                  .deleteProject(project.id);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            if (project.status != ResearchStatus.completed)
+                              const PopupMenuItem(
+                                value: 'complete',
+                                child: ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.task_alt_rounded,
+                                      color: Color(0xFF1565C0)),
+                                  title: Text('Mark completed'),
+                                ),
+                              ),
+                            const PopupMenuItem(
+                                value: 'duplicate', child: Text('Duplicate')),
+                            const PopupMenuItem(
+                                value: 'archive', child: Text('Archive')),
+                            const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete',
+                                    style: TextStyle(color: Colors.red))),
+                          ],
+                        ),
                     ],
                   ),
                   const SizedBox(height: 10),

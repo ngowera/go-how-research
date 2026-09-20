@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
             const mean = n ? numbers.reduce((a,b)=>a+b,0)/n : null;
             summary.statistics = { n, mean, min: n ? numbers.reduce((a,b)=>Math.min(a,b)) : null, max: n ? numbers.reduce((a,b)=>Math.max(a,b)) : null,
               sampleSD: n > 1 ? Math.sqrt(numbers.reduce((a,b)=>a+(b-mean!)**2,0)/(n-1)) : null };
-          } else if (['singleChoice','multipleChoice','yesNo'].includes(q.question_type)) {
+          } else if (['singleChoice','multipleChoice','yesNo','thumbs'].includes(q.question_type)) {
             const counts: Record<string, number> = Object.create(null);
             for (const value of values.flat()) { const label=String(value); counts[label]=(counts[label]??0)+1; }
             summary.frequencies = counts;

@@ -239,7 +239,15 @@ class QuestionsNotifier extends StateNotifier<List<Question>> {
       options: (type == QuestionType.singleChoice ||
               type == QuestionType.multipleChoice)
           ? ['Option 1', 'Option 2', 'Option 3']
-          : [],
+          : type == QuestionType.likertScale
+              ? [
+                  'Strongly disagree',
+                  'Disagree',
+                  'Neutral',
+                  'Agree',
+                  'Strongly agree'
+                ]
+              : [],
       rows: type == QuestionType.matrix ? ['Row 1', 'Row 2'] : [],
       columns: type == QuestionType.matrix ? ['Col 1', 'Col 2', 'Col 3'] : [],
     );

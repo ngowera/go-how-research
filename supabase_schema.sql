@@ -27,7 +27,7 @@ create table if not exists public.questionnaires (
 create table if not exists public.questions (
  id text primary key, questionnaire_id text not null references public.questionnaires(id) on delete cascade,
  order_index integer not null check(order_index>=0), question_type text not null check(question_type in
- ('text','number','singleChoice','multipleChoice','likertScale','rating','date','matrix','yesNo')),
+ ('text','number','singleChoice','multipleChoice','likertScale','rating','date','matrix','yesNo','thumbs')),
  question_text text not null check(length(trim(question_text))>0), help_text text, is_required boolean not null default false,
  options_json jsonb not null default '[]' check(jsonb_typeof(options_json)='array'), min_value double precision, max_value double precision,
  skip_logic_json jsonb, rows_json jsonb not null default '[]' check(jsonb_typeof(rows_json)='array'),
@@ -224,7 +224,10 @@ create policy project_access_requests_update on public.project_access_requests f
 drop policy if exists notifications_select on public.notifications;
 create policy notifications_select on public.notifications for select to authenticated using(recipient_id=(select auth.uid())::text);
 drop policy if exists notifications_update on public.notifications;
-create policy notifications_update on public.notifications for update to authenticated using(recipient_id=(select auth.uid())::text);
+-- Prevent a recipient from reassigning a notification to another account.
+create policy notifications_update on public.notifications for update to authenticated
+ using(recipient_id=(select auth.uid())::text)
+ with check(recipient_id=(select auth.uid())::text);
 
 -- RLS helpers must be security definer so policies do not recursively invoke
 -- each other through projects, users, and project_members.

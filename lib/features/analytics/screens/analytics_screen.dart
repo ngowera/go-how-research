@@ -55,6 +55,26 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
     final questionnaires = questionnairesState.questionnaires
         .where((q) => q.projectId == widget.projectId)
         .toList();
+    final allProjects = [...ref.watch(projectsProvider).projects];
+    final allQuestionnaires = questionnairesState.questionnaires;
+    final activityByProject = <String, DateTime>{
+      for (final p in allProjects) p.id: p.updatedAt,
+    };
+    for (final questionnaire in allQuestionnaires) {
+      final current = activityByProject[questionnaire.projectId];
+      if (current == null || questionnaire.updatedAt.isAfter(current)) {
+        activityByProject[questionnaire.projectId] = questionnaire.updatedAt;
+      }
+      for (final response
+          in ref.watch(responsesProvider(questionnaire.id)).responses) {
+        final latest = activityByProject[questionnaire.projectId];
+        if (latest == null || response.collectedAt.isAfter(latest)) {
+          activityByProject[questionnaire.projectId] = response.collectedAt;
+        }
+      }
+    }
+    allProjects.sort((a, b) => (activityByProject[b.id] ?? b.updatedAt)
+        .compareTo(activityByProject[a.id] ?? a.updatedAt));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -63,6 +83,10 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (allProjects.isNotEmpty) ...[
+              _buildProjectSelector(allProjects, activityByProject),
+              const SizedBox(height: 18),
+            ],
             // Top Nav & Title
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -278,6 +302,114 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProjectSelector(
+    List<ResearchProject> projects,
+    Map<String, DateTime> activityByProject,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.folder_copy_outlined,
+                size: 18, color: Color(0xFF64748B)),
+            const SizedBox(width: 8),
+            Text('Research projects',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF475569))),
+            const SizedBox(width: 8),
+            Text('Most recently active first',
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: const Color(0xFF94A3B8))),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 76,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: projects.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final project = projects[index];
+              final selected = project.id == widget.projectId;
+              final activity =
+                  activityByProject[project.id] ?? project.updatedAt;
+              final age = DateTime.now().difference(activity);
+              final activityText = age.inMinutes < 2
+                  ? 'Active now'
+                  : age.inHours < 24
+                      ? '${age.inHours}h ago'
+                      : age.inDays < 30
+                          ? '${age.inDays}d ago'
+                          : '${activity.day}/${activity.month}/${activity.year}';
+              return Material(
+                color: selected ? const Color(0xFFE0F2F1) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: selected
+                      ? null
+                      : () => context.go('/analytics/${project.id}'),
+                  child: Container(
+                    width: 220,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: selected
+                              ? AppTheme.kPrimary
+                              : const Color(0xFFE2E8F0),
+                          width: selected ? 1.5 : 1),
+                    ),
+                    child: Row(children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: selected
+                            ? AppTheme.kPrimary
+                            : const Color(0xFFF1F5F9),
+                        child: Icon(Icons.analytics_outlined,
+                            size: 20,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF64748B)),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(project.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1E293B))),
+                            Text(activityText,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 10,
+                                    color: selected
+                                        ? const Color(0xFF00796B)
+                                        : const Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

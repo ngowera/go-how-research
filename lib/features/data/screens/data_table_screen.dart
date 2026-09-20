@@ -62,17 +62,6 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                    onPressed: responses.isEmpty
-                        ? null
-                        : () => showDialog(
-                            context: context,
-                            builder: (_) => ExportDialog(
-                                questions: questions, responses: responses)),
-                    icon: const Icon(Icons.import_export),
-                    label: const Text('Prepare Excel / SPSS export'))),
             // Top Bar
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +74,8 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                           context.go('/projects/${widget.projectId}'),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Column(
+                    Expanded(
+                        child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -153,11 +143,22 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                               }
                             },
                       icon: const Icon(Icons.table_view_rounded, size: 18),
-                      label: const Text('Export Excel'),
+                      label: const Text('Excel: response table'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00897B),
                         foregroundColor: Colors.white,
                       ),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton.tonalIcon(
+                      onPressed: responses.isEmpty
+                          ? null
+                          : () => showDialog(
+                              context: context,
+                              builder: (_) => ExportDialog(
+                                  questions: questions, responses: responses)),
+                      icon: const Icon(Icons.science_outlined, size: 18),
+                      label: const Text('Analysis export: Excel / SPSS'),
                     ),
                     const SizedBox(width: 10),
                     ElevatedButton.icon(
@@ -173,6 +174,24 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                   ],
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDFA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF99F6E4)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.info_outline, size: 18, color: Color(0xFF0F766E)),
+                SizedBox(width: 8),
+                Expanded(
+                    child: Text(
+                        'Response-table Excel keeps answers as entered. Analysis export codes categories and includes an Excel codebook, or creates an SPSS .sav file.',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF115E59)))),
+              ]),
             ),
             const SizedBox(height: 20),
 

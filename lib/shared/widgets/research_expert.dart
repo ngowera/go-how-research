@@ -43,18 +43,18 @@ class ResearchAssistantButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => FloatingActionButton(
-    heroTag: 'research-assistant',
-    tooltip: 'Open Research Assistant',
-    backgroundColor: const Color(0xFF4B2A1D),
-    foregroundColor: const Color(0xFFFFF4EA),
-    elevation: 10,
-    shape: const CircleBorder(),
-    onPressed: () => _openPanel(context),
-    child: const Text(
-      'RA',
-      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-    ),
-  );
+        heroTag: 'research-assistant',
+        tooltip: 'Open Research Assistant',
+        backgroundColor: const Color(0xFF4B2A1D),
+        foregroundColor: const Color(0xFFFFF4EA),
+        elevation: 10,
+        shape: const CircleBorder(),
+        onPressed: () => _openPanel(context),
+        child: const Text(
+          'RA',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+      );
 }
 
 class ResearchAssistantPanel extends ConsumerStatefulWidget {
@@ -116,7 +116,7 @@ class _ResearchAssistantPanelState
         setState(
           () => error = e.details is Map
               ? (e.details['error']?.toString() ??
-                    'Research Assistant is unavailable.')
+                  'Research Assistant is unavailable.')
               : 'Research Assistant is unavailable. Deploy the server function and sign in online.',
         );
     } catch (e) {
@@ -290,11 +290,11 @@ class _ResearchAssistantPanelState
                             onChanged: busy
                                 ? null
                                 : (v) => setState(() {
-                                    projectId = v == '' ? null : v;
-                                    messages.clear();
-                                    coverage = null;
-                                    error = null;
-                                  }),
+                                      projectId = v == '' ? null : v;
+                                      messages.clear();
+                                      coverage = null;
+                                      error = null;
+                                    }),
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 8),
@@ -366,9 +366,8 @@ class _ResearchAssistantPanelState
                                   Text(
                                     error!,
                                     style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .error,
+                                      color:
+                                          Theme.of(context).colorScheme.error,
                                     ),
                                   ),
                               ],

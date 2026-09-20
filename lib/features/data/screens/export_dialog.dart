@@ -33,7 +33,7 @@ class _ExportDialogState extends State<ExportDialog> {
     final dataset =
         PreparedDataset.build(questions, responses, includeCodes: includeCodes);
     return AlertDialog(
-      title: const Text('Prepare data for Excel or SPSS'),
+      title: const Text('Statistical data export'),
       content: SizedBox(
           width: 650,
           child: SingleChildScrollView(
@@ -41,16 +41,38 @@ class _ExportDialogState extends State<ExportDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 const Text(
-                    'One row per response. Categories are coded, multiple selections and matrix rows become separate columns. Excel includes a codebook and validation notes.'),
+                    'Export an analysis-ready dataset. One row represents one response; categories are coded and matrix or multiple-choice answers become separate columns.'),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                    initialValue: format,
-                    decoration: const InputDecoration(labelText: 'File format'),
-                    items: ['Excel', 'SPSS (.sav)', 'CSV']
-                        .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                        .toList(),
-                    onChanged:
-                        busy ? null : (f) => setState(() => format = f!)),
+                SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                          value: 'Excel',
+                          icon: Icon(Icons.table_chart_outlined),
+                          label: Text('Excel + codebook')),
+                      ButtonSegment(
+                          value: 'SPSS (.sav)',
+                          icon: Icon(Icons.analytics_outlined),
+                          label: Text('SPSS (.sav)')),
+                      ButtonSegment(
+                          value: 'CSV',
+                          icon: Icon(Icons.description_outlined),
+                          label: Text('CSV')),
+                    ],
+                    selected: {
+                      format
+                    },
+                    onSelectionChanged: busy
+                        ? null
+                        : (value) => setState(() => format = value.first)),
+                const SizedBox(height: 8),
+                Text(
+                  format == 'Excel'
+                      ? 'Creates an analysis-ready workbook with data, a question/codebook sheet and validation notes.'
+                      : format == 'SPSS (.sav)'
+                          ? 'Creates a coded SPSS system file for statistical analysis. Long free-text fields may need Excel.'
+                          : 'Creates a portable analysis-ready table. A codebook is not embedded; choose Excel when labels are needed.',
+                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                ),
                 CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Include participant codes'),
@@ -106,6 +128,7 @@ class _ExportDialogState extends State<ExportDialog> {
             onPressed: busy || responses.isEmpty || questions.isEmpty
                 ? null
                 : () async {
+                    final messenger = ScaffoldMessenger.of(context);
                     setState(() {
                       busy = true;
                       error = null;
@@ -129,10 +152,11 @@ class _ExportDialogState extends State<ExportDialog> {
                                   ? 'text/csv'
                                   : 'application/octet-stream',
                           subject: 'Prepared research dataset');
-                      if (mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      if (mounted) {
+                        messenger.showSnackBar(SnackBar(
                             content: Text(
-                                'Prepared dataset exported. Use Excel export for the matching codebook.')));
+                                'Analysis-ready dataset exported${format == 'Excel' ? ' with its codebook' : ''}.')));
+                      }
                     } catch (e) {
                       if (mounted) setState(() => error = e.toString());
                     } finally {

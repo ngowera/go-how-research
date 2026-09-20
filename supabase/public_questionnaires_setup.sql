@@ -60,7 +60,7 @@ begin
       case when l.collect_contact then left(p_email,254) else null end,true,now(),
       'Online questionnaire consent: ' || l.consent_text);
   insert into public.responses(id,questionnaire_id,participant_id,responses_json,collected_at)
-    values(response,q.id,code,p_answers,now());
+    values(response,q.id,participant,p_answers,now());
   insert into public.questionnaire_link_receipts(link_id,submission_id,response_id)
     values(l.id,p_submission_id,response);
   return jsonb_build_object('submitted',true,'receipt',response);

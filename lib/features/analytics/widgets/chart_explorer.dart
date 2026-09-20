@@ -20,51 +20,45 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
   bool percent = false;
   final boundary = GlobalKey();
   String? error;
+
+  List<Color> _chartColors(String palette, int count, String seedText) {
+    if (count <= 0) return const [];
+    final bases = palette.contains('Emerald')
+        ? const [168.0, 145.0, 112.0]
+        : palette.contains('Sunset')
+            ? const [24.0, 38.0, 12.0, 18.0]
+            : palette.contains('Vibrant')
+                ? const [285.0, 335.0, 198.0, 132.0]
+                : palette.contains('Colorblind')
+                    ? const [202.0, 40.0, 164.0, 326.0]
+                    : const [210.0, 174.0, 28.0, 282.0, 188.0, 18.0];
+    final seed =
+        seedText.codeUnits.fold<int>(0, (a, b) => (a * 31 + b) & 0xffff);
+    if (palette.contains('Grayscale')) {
+      return List.generate(count, (i) {
+        final lightness = .20 + ((i * .61803398875) % 1) * .58;
+        return HSLColor.fromAHSL(1, 0, 0, lightness).toColor();
+      });
+    }
+    // The golden-angle step gives every category a distinct, deterministic
+    // colour without repeating short palettes. Teal and brown are included in
+    // the default anchors, while saturation/lightness variation keeps large
+    // distributions readable.
+    return List.generate(count, (i) {
+      final anchor = bases[i % bases.length];
+      final cycle = i ~/ bases.length;
+      final hue = (anchor + cycle * 137.507764 + seed % 23) % 360;
+      final saturation = .58 + ((i * 7 + seed) % 18) / 100;
+      final lightness = .38 + ((i * 11 + seed) % 22) / 100;
+      return HSLColor.fromAHSL(1, hue, saturation, lightness).toColor();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
     final numeric = result.mean != null;
     final settings = ref.watch(appSettingsProvider);
-    final colors = settings.chartPalette.contains('Emerald')
-        ? [
-            const Color(0xFF00695C),
-            const Color(0xFF26A69A),
-            const Color(0xFF81C784),
-            const Color(0xFF33691E)
-          ]
-        : settings.chartPalette.contains('Sunset')
-            ? [
-                const Color(0xFFE65100),
-                const Color(0xFFF9A825),
-                const Color(0xFFBF360C),
-                const Color(0xFF8D6E63)
-              ]
-            : settings.chartPalette.contains('Vibrant')
-                ? [
-                    const Color(0xFF7B1FA2),
-                    const Color(0xFFD81B60),
-                    const Color(0xFF0288D1),
-                    const Color(0xFF43A047)
-                  ]
-                : settings.chartPalette.contains('Grayscale')
-                    ? [
-                        Colors.grey.shade800,
-                        Colors.grey.shade600,
-                        Colors.grey.shade400
-                      ]
-                    : settings.chartPalette.contains('Colorblind')
-                        ? [
-                            const Color(0xFF0072B2),
-                            const Color(0xFFE69F00),
-                            const Color(0xFF009E73),
-                            const Color(0xFFCC79A7)
-                          ]
-                        : [
-                            const Color(0xFF1565C0),
-                            const Color(0xFF00897B),
-                            const Color(0xFFF57C00),
-                            const Color(0xFF7B1FA2)
-                          ];
     var labels = result.chartData.map((e) => e['label'].toString()).toList();
     var counts =
         result.chartData.map((e) => (e['value'] as num).toDouble()).toList();
@@ -99,6 +93,8 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
         : 'Frequency (recorded selections)';
     final labelList = labels;
     final countList = counts;
+    final colors = _chartColors(
+        settings.chartPalette, math.max(1, labels.length), result.questionId);
     Widget plot;
     if (total <= 0) {
       plot = const SizedBox(
@@ -144,6 +140,7 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                   ]))));
     } else {
       final maxY = values.reduce(math.max) * 1.15;
+      final isHistogram = type == 'Histogram';
       final titles = FlTitlesData(
           topTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -154,9 +151,11 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
               axisNameSize: 24,
               sideTitles: const SideTitles(showTitles: true, reservedSize: 40)),
           bottomTitles: AxisTitles(
-              axisNameWidget: const Text(
-                  'Response / category number (see labels below)',
-                  style: TextStyle(fontSize: 11)),
+              axisNameWidget: Text(
+                  isHistogram
+                      ? 'Continuous value intervals'
+                      : 'Response categories (see numbered key below)',
+                  style: const TextStyle(fontSize: 11)),
               axisNameSize: 25,
               sideTitles: SideTitles(
                   showTitles: true,
@@ -185,22 +184,49 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
           : BarChart(BarChartData(
               minY: 0,
               maxY: maxY,
+              alignment: isHistogram
+                  ? BarChartAlignment.center
+                  : BarChartAlignment.spaceAround,
+              groupsSpace: isHistogram ? 0 : 12,
               titlesData: titles,
+              gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (_) =>
+                      const FlLine(color: Color(0xFFE2E8F0), strokeWidth: 1)),
+              borderData: FlBorderData(
+                  show: true,
+                  border: const Border(
+                      left: BorderSide(color: Color(0xFF94A3B8)),
+                      bottom: BorderSide(color: Color(0xFF94A3B8)))),
+              barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => const Color(0xFF1E293B),
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) =>
+                          BarTooltipItem(
+                              '${labels[group.x]}\n${rod.toY.toStringAsFixed(percent ? 1 : 0)}${percent ? '%' : ''}',
+                              const TextStyle(color: Colors.white)))),
               barGroups: List.generate(
                   values.length,
                   (i) => BarChartGroupData(x: i, barRods: [
                         BarChartRodData(
                             toY: values[i],
-                            color: colors[i % colors.length],
-                            width: type == 'Histogram' ? 28 : 20,
-                            borderRadius: BorderRadius.zero)
+                            color: isHistogram
+                                ? const Color(0xFF00897B)
+                                : colors[i],
+                            width: isHistogram ? 40 : 20,
+                            borderRadius: isHistogram
+                                ? BorderRadius.zero
+                                : const BorderRadius.vertical(
+                                    top: Radius.circular(5)))
                       ]))));
       plot = SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
               width: math.max(
                   MediaQuery.sizeOf(context).width > 1000 ? 650 : 300,
-                  labels.length * 44.0),
+                  labels.length * (type == 'Histogram' ? 40.0 : 52.0)),
               height: 280,
               child: chart));
     }
@@ -248,9 +274,10 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                                 mimeType: 'image/png',
                                 subject: result.questionText);
                           } catch (e) {
-                            if (mounted)
+                            if (mounted) {
                               setState(
                                   () => error = 'Could not save chart. $e');
+                            }
                           }
                         }),
                   ]),
@@ -297,7 +324,13 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                                               height: 12,
                                               margin: const EdgeInsets.only(
                                                   top: 3, right: 8),
-                                              color: colors[i % colors.length]),
+                                              decoration: BoxDecoration(
+                                                  color: type == 'Histogram'
+                                                      ? const Color(0xFF00897B)
+                                                      : colors[i],
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          2))),
                                           Expanded(
                                               child: Text(
                                                   '${i + 1}. ${labelList[i]}',

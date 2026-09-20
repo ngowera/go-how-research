@@ -83,25 +83,23 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
             padding: const EdgeInsets.all(18),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Your profile',
+              const Text('Your profile',
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-                InkWell(
+              InkWell(
                 onTap: busy ? null : _showPhotoActions,
                 customBorder: const CircleBorder(),
                 child: ProfileAvatar(
-                  name: user?.name ?? '',
-                  image: user?.avatarUrl,
-                  radius: 48),
-                ),
-                const SizedBox(height: 10),
-                Text(user?.name ?? 'Researcher',
+                    name: user?.name ?? '', image: user?.avatarUrl, radius: 48),
+              ),
+              const SizedBox(height: 10),
+              Text(user?.name ?? 'Researcher',
                   style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700)),
+                      fontSize: 17, fontWeight: FontWeight.w700)),
               if (error != null)
                 Text(error!, style: const TextStyle(color: Colors.red)),
               const SizedBox(height: 14),
-                const Text('Accent colour'),
+              const Text('Accent colour'),
               Wrap(
                   spacing: 8,
                   children: [0xFF1565C0, 0xFF00897B, 0xFF7B1FA2, 0xFFAD4B00]
@@ -119,29 +117,31 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
                           onSelected: (_) =>
                               notifier.updateAppearance(accentColor: color)))
                       .toList()),
-                const SizedBox(height: 12),
-                const Text('Sidebar colour'),
-                Wrap(
+              const SizedBox(height: 12),
+              const Text('Sidebar colour'),
+              Wrap(
                 spacing: 8,
-                  children: (const [
-                    0xFFFFFFFF,
-                    0xFF000000,
-                    0xFF1565C0,
-                    0xFF00897B,
-                  ]).map((color) => ChoiceChip(
-                    label: Text(color == 0xFFFFFFFF
-                      ? 'White'
-                      : color == 0xFF000000
-                        ? 'Black'
-                        : color == 0xFF1565C0
-                          ? 'Blue'
-                          : 'Teal'),
-                    avatar: CircleAvatar(
-                      backgroundColor: Color(color), radius: 7),
-                    selected: settings.sidebarColor == color,
-                    onSelected: (_) => notifier.updateSidebarColor(color),
-                  )).toList(),
-                ),
+                children: (const [
+                  0xFFFFFFFF,
+                  0xFF000000,
+                  0xFF1565C0,
+                  0xFF00897B,
+                ])
+                    .map((color) => ChoiceChip(
+                          label: Text(color == 0xFFFFFFFF
+                              ? 'White'
+                              : color == 0xFF000000
+                                  ? 'Black'
+                                  : color == 0xFF1565C0
+                                      ? 'Blue'
+                                      : 'Teal'),
+                          avatar: CircleAvatar(
+                              backgroundColor: Color(color), radius: 7),
+                          selected: settings.sidebarColor == color,
+                          onSelected: (_) => notifier.updateSidebarColor(color),
+                        ))
+                    .toList(),
+              ),
             ])));
   }
 }

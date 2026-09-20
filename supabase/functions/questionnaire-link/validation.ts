@@ -28,6 +28,7 @@ export function cleanAnswers(questions: any[], answers: Record<string, any>) {
         if (!Array.isArray(v) || v.some(x => !q.options_json.includes(x))) invalid();
         v = [...new Set(v)]; break;
       case 'yesNo': if (!['YES','NO'].includes(v)) invalid(); break;
+      case 'thumbs': if (!['UP','DOWN'].includes(v)) invalid(); break;
       case 'date':
         if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v)) || new Date(v).toISOString().slice(0,10) !== v) invalid(); break;
       case 'matrix':

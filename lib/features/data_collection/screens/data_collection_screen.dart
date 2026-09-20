@@ -598,25 +598,49 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
 
       case QuestionType.likertScale:
         final currentVal = _answers[q.id] as int?;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        const defaults = [
+          'Strongly disagree',
+          'Disagree',
+          'Neutral',
+          'Agree',
+          'Strongly agree'
+        ];
+        const colors = [
+          Color(0xFFC62828),
+          Color(0xFFEF6C00),
+          Color(0xFFF9A825),
+          Color(0xFF00897B),
+          Color(0xFF2E7D32)
+        ];
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [1, 2, 3, 4, 5].map((val) {
             final isSelected = currentVal == val;
+            final label =
+                q.options.length == 5 ? q.options[val - 1] : defaults[val - 1];
             return InkWell(
               onTap: () => _setAnswer(q.id, val),
-              child: Expanded(
-                child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 126,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.kPrimary : Colors.grey.shade100,
+                  color: isSelected
+                      ? colors[val - 1]
+                      : colors[val - 1].withOpacity(.09),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color:
-                        isSelected ? AppTheme.kPrimary : Colors.grey.shade300,
+                    color: isSelected
+                        ? colors[val - 1]
+                        : colors[val - 1].withOpacity(.45),
                   ),
                 ),
-                  child: Center(
-                    child: Text(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
                       '$val',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
@@ -624,7 +648,14 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
                         color: isSelected ? Colors.white : Colors.grey.shade700,
                       ),
                     ),
-                  ),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: isSelected ? Colors.white : colors[val - 1]),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -677,15 +708,43 @@ class _DataCollectionScreenState extends ConsumerState<DataCollectionScreen> {
           ],
         );
 
+      case QuestionType.thumbs:
+        final val = _answers[q.id] as String?;
+        return Wrap(
+          spacing: 12,
+          children: [
+            ChoiceChip(
+              avatar: Icon(Icons.thumb_up_alt_rounded,
+                  color: val == 'UP' ? Colors.white : const Color(0xFF2E7D32)),
+              label: const Text('Like'),
+              selected: val == 'UP',
+              selectedColor: const Color(0xFF2E7D32),
+              labelStyle: TextStyle(color: val == 'UP' ? Colors.white : null),
+              onSelected: (_) => _setAnswer(q.id, 'UP'),
+            ),
+            ChoiceChip(
+              avatar: Icon(Icons.thumb_down_alt_rounded,
+                  color:
+                      val == 'DOWN' ? Colors.white : const Color(0xFFC62828)),
+              label: const Text('Dislike'),
+              selected: val == 'DOWN',
+              selectedColor: const Color(0xFFC62828),
+              labelStyle: TextStyle(color: val == 'DOWN' ? Colors.white : null),
+              onSelected: (_) => _setAnswer(q.id, 'DOWN'),
+            ),
+          ],
+        );
+
       case QuestionType.date:
         final dateVal = _answers[q.id] as String?;
         return InkWell(
           onTap: () async {
             final picked = await showDatePicker(
               context: context,
-              initialDate: DateTime.now(),
-              firstDate: DateTime(2000),
+              initialDate: DateTime.tryParse(dateVal ?? '') ?? DateTime.now(),
+              firstDate: DateTime(1900),
               lastDate: DateTime(2100),
+              helpText: 'Choose a date',
             );
             if (picked != null) {
               setState(() {

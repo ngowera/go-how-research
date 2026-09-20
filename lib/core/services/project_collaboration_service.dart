@@ -39,20 +39,36 @@ class ProjectAccessRequest {
 
 class ProjectNotification {
   const ProjectNotification({
+    required this.id,
+    required this.kind,
     required this.title,
     required this.body,
     required this.createdAt,
+    this.relatedId,
+    this.readAt,
   });
 
+  final String id;
+  final String kind;
   final String title;
   final String body;
   final DateTime createdAt;
+  final String? relatedId;
+  final DateTime? readAt;
+
+  bool get isUnread => readAt == null;
 
   factory ProjectNotification.fromJson(Map<String, dynamic> json) {
     return ProjectNotification(
+      id: json['id'] as String,
+      kind: json['kind'] as String,
       title: json['title'] as String,
       body: json['body'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
+      relatedId: json['related_id'] as String?,
+      readAt: json['read_at'] == null
+          ? null
+          : DateTime.parse(json['read_at'] as String),
     );
   }
 }
@@ -110,11 +126,13 @@ class ProjectCollaborationService {
   Future<List<ProjectAccessRequest>> incomingRequests() async {
     final rows = await _client
         .from('project_access_requests')
-        .select('id,project_id,requester_id,requested_role,status,project:projects(title),requester:users(name,email)')
+        .select(
+            'id,project_id,requester_id,requested_role,status,project:projects(title),requester:users(name,email)')
         .eq('status', 'pending')
         .order('created_at', ascending: false);
     return (rows as List)
-        .map((row) => ProjectAccessRequest.fromJson(row as Map<String, dynamic>))
+        .map(
+            (row) => ProjectAccessRequest.fromJson(row as Map<String, dynamic>))
         .toList();
   }
 
@@ -131,12 +149,29 @@ class ProjectCollaborationService {
   Future<List<ProjectNotification>> notifications() async {
     final rows = await _client
         .from('notifications')
-        .select('title,body,created_at')
+        .select('id,kind,title,body,related_id,read_at,created_at')
         .order('created_at', ascending: false)
-        .limit(10);
+        .limit(30);
     return (rows as List)
         .map((row) => ProjectNotification.fromJson(row as Map<String, dynamic>))
         .toList();
+  }
+
+  Stream<List<ProjectNotification>> watchNotifications() {
+    return _client
+        .from('notifications')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .limit(30)
+        .map((rows) => rows.map(ProjectNotification.fromJson).toList());
+  }
+
+  Future<void> markNotificationsRead(Iterable<String> ids) async {
+    final unreadIds = ids.toList(growable: false);
+    if (unreadIds.isEmpty) return;
+    await _client.from('notifications').update({
+      'read_at': DateTime.now().toUtc().toIso8601String(),
+    }).inFilter('id', unreadIds);
   }
 
   Future<List<ProjectMember>> membersForProject(String projectId) async {

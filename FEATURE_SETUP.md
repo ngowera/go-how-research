@@ -6,9 +6,22 @@ Windows tooling installed. Android packaging is deferred.
 
 ## Gemini server configuration
 
-In the GOHOW RESEARCH Supabase project's Edge Function secrets, add
-`GEMINI_API_KEY`. Optionally set `GEMINI_MODEL`; the functions default to
-`gemini-2.5-flash`. Keep this key on the server, never in Flutter or a web bundle.
+In the GOHOW RESEARCH Supabase project, open **Edge Functions > Secrets** and add:
+
+- `GEMINI_API_KEY` = the Google AI Studio API key
+- `GEMINI_MODEL` = `gemini-2.5-flash`
+
+Alternatively, after `supabase login` and `supabase link`, set only the model
+from the project directory with:
+
+```bash
+npx supabase secrets set GEMINI_MODEL=gemini-2.5-flash
+```
+
+Supabase makes a changed secret available to functions immediately; the function
+does not need redeployment just for a secret change. Deploy changed function code
+with `npx supabase functions deploy research-expert --use-api`. Keep the API key
+on the server, never in Flutter, `.env`, GitHub Actions, or a web bundle.
 
 The function sources are `supabase/functions/research-expert/index.ts` and
 `supabase/functions/transcribe-interview/index.ts`. Interview database and private

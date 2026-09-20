@@ -107,9 +107,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         .where((q) => q.projectId == widget.projectId)
         .toList();
     final canManageQuestionnaires = project != null &&
-      (project.ownerId == currentUser?.id ||
-        project.supervisorId == currentUser?.id ||
-        currentUser?.role == UserRole.admin);
+        (project.ownerId == currentUser?.id ||
+            project.supervisorId == currentUser?.id ||
+            currentUser?.role == UserRole.admin);
 
     if (project == null) {
       return Scaffold(

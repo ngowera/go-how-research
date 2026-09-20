@@ -20,6 +20,7 @@ enum QuestionType {
   date,
   matrix,
   yesNo,
+  thumbs,
 }
 
 enum ResearchStatus { draft, active, completed, archived, paused }
