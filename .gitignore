@@ -1,5 +1,6 @@
 # Flutter & Dart gitignore
 .dart_tool/
+supabase/.temp/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages

@@ -43,7 +43,7 @@ Deno.serve(async(req:Request)=>{
         state=(await check.json()).state;
       }
       if(state==='FAILED'||state==='PROCESSING')return reply({error:'Audio is not ready for transcription. Try a shorter clip or retry shortly.'},502);
-      const model=Deno.env.get('GEMINI_MODEL')||'gemini-2.5-flash';
+      const model=Deno.env.get('GEMINI_MODEL')||'gemini-3.6-flash';
       if(!/^[a-zA-Z0-9._-]+$/.test(model))return reply({error:'Invalid server model configuration.'},503);
       const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
         method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},signal:AbortSignal.timeout(100000),

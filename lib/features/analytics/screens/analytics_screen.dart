@@ -12,6 +12,7 @@ import '../../../core/providers/questionnaire_provider.dart';
 import '../../../core/providers/responses_provider.dart';
 import '../../../core/utils/statistics_utils.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../../data/screens/export_dialog.dart';
 import '../widgets/chart_explorer.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
@@ -55,6 +56,16 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
     final questionnaires = questionnairesState.questionnaires
         .where((q) => q.projectId == widget.projectId)
         .toList();
+    final selectedQuestionnaireId = analyticsState.selectedQuestionnaireId ??
+        (questionnaires.isEmpty ? null : questionnaires.first.id);
+    final exportQuestions = selectedQuestionnaireId == null
+        ? const <Question>[]
+        : ref.watch(
+            questionsByQuestionnaireProvider(selectedQuestionnaireId),
+          );
+    final exportResponses = selectedQuestionnaireId == null
+        ? const <QuestionnaireResponse>[]
+        : ref.watch(responsesProvider(selectedQuestionnaireId)).responses;
     final allProjects = [...ref.watch(projectsProvider).projects];
     final allQuestionnaires = questionnairesState.questionnaires;
     final activityByProject = <String, DateTime>{
@@ -121,40 +132,59 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
                     ),
                   ],
                 ),
-                // Questionnaire selector
                 if (questionnaires.isNotEmpty)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: analyticsState.selectedQuestionnaireId ??
-                            questionnaires.first.id,
-                        items: questionnaires.map((q) {
-                          return DropdownMenuItem(
-                            value: q.id,
-                            child: Text(
-                              q.title,
-                              style: GoogleFonts.poppins(
-                                  fontSize: 13, fontWeight: FontWeight.w500),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            ref
-                                .read(analyticsProvider(widget.projectId)
-                                    .notifier)
-                                .loadAnalyticsForQuestionnaire(val);
-                          }
-                        },
+                  Row(
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed:
+                            exportQuestions.isEmpty || exportResponses.isEmpty
+                                ? null
+                                : () => showDialog<void>(
+                                      context: context,
+                                      builder: (_) => ExportDialog(
+                                        questions: exportQuestions,
+                                        responses: exportResponses,
+                                      ),
+                                    ),
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: const Text('Export Excel / SPSS'),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: analyticsState.selectedQuestionnaireId ??
+                                questionnaires.first.id,
+                            items: questionnaires.map((q) {
+                              return DropdownMenuItem(
+                                value: q.id,
+                                child: Text(
+                                  q.title,
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                ref
+                                    .read(analyticsProvider(widget.projectId)
+                                        .notifier)
+                                    .loadAnalyticsForQuestionnaire(val);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),

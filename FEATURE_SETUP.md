@@ -9,13 +9,13 @@ Windows tooling installed. Android packaging is deferred.
 In the GOHOW RESEARCH Supabase project, open **Edge Functions > Secrets** and add:
 
 - `GEMINI_API_KEY` = the Google AI Studio API key
-- `GEMINI_MODEL` = `gemini-2.5-flash`
+- `GEMINI_MODEL` = `gemini-3.6-flash`
 
 Alternatively, after `supabase login` and `supabase link`, set only the model
 from the project directory with:
 
 ```bash
-npx supabase secrets set GEMINI_MODEL=gemini-2.5-flash
+npx supabase secrets set GEMINI_MODEL=gemini-3.6-flash
 ```
 
 Supabase makes a changed secret available to functions immediately; the function
