@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/sync_provider.dart';
+import '../../../core/providers/billing_provider.dart';
 import 'public_questionnaire_screen.dart';
 
 class QuestionnaireShareDialog extends ConsumerStatefulWidget {
@@ -81,6 +82,7 @@ class _QuestionnaireShareDialogState
 
   @override
   Widget build(BuildContext context) {
+    final billing = ref.watch(billingProvider);
     final active = _link?['active'] == true &&
         DateTime.parse(_link!['expires_at']).isAfter(DateTime.now());
     final url =
@@ -144,17 +146,27 @@ class _QuestionnaireShareDialogState
                       value: _contact,
                       onChanged:
                           _busy ? null : (v) => setState(() => _contact = v)),
-                  DropdownButtonFormField<int>(
-                      initialValue: _days,
-                      decoration: const InputDecoration(
-                          labelText: 'Accept responses for'),
-                      items: [7, 30, 90, 365]
-                          .map((d) => DropdownMenuItem(
-                              value: d, child: Text('$d days')))
-                          .toList(),
-                      onChanged: _busy
-                          ? null
-                          : (v) => setState(() => _days = v ?? 30)),
+                  if (billing.hasUnlimitedQuestionnaires)
+                    DropdownButtonFormField<int>(
+                        initialValue: _days,
+                        decoration: const InputDecoration(
+                            labelText: 'Accept responses for'),
+                        items: [7, 30, 90, 365]
+                            .map((d) => DropdownMenuItem(
+                                value: d, child: Text('$d days')))
+                            .toList(),
+                        onChanged: _busy
+                            ? null
+                            : (v) => setState(() => _days = v ?? 30))
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: const Text(
+                          'Free plan: this link stays online for 5 minutes. Another link can be published after 7 days.'),
+                    ),
                   const SizedBox(height: 12),
                   const Text(
                       'Anyone with this public link can respond. Participants cannot see other answers. The link accepts up to 10,000 submissions.'),

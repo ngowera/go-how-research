@@ -182,7 +182,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'GOHOW RESEARCH REPORT',
+                                          'GO-HOW RS REPORT',
                                           style: GoogleFonts.poppins(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,

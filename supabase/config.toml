@@ -1,0 +1,5 @@
+[functions.questionnaire-link]
+verify_jwt = false
+
+[functions.paychangu-webhook]
+verify_jwt = false

@@ -1,12 +1,12 @@
 #!/bin/bash
 # =========================================================================
-# GoHow Research - Linux Automated Build Script
+# Go-How RS - Linux Automated Build Script
 # =========================================================================
 set -e
 
 echo ""
 echo "========================================================================="
-echo "   GoHow Research - Building for Linux Desktop (Ubuntu/Debian)"
+echo "   Go-How RS - Building for Linux Desktop (Ubuntu/Debian)"
 echo "========================================================================="
 echo ""
 

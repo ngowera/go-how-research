@@ -204,7 +204,7 @@ class PreparedDataset {
           'SPSS export supports text up to 255 UTF-8 bytes. Deselect long-text questions or use Excel.');
     final slots = widths.map((w) => w == 0 ? 1 : (w + 7) ~/ 8).toList();
     fixed(r'$FL2', 4);
-    fixed('@(#) SPSS DATA FILE GoHow Research', 60);
+    fixed('@(#) SPSS DATA FILE Go-How RS', 60);
     i32(2);
     i32(slots.fold(0, (a, b) => a + b));
     i32(0);
@@ -213,7 +213,7 @@ class PreparedDataset {
     f64(100);
     fixed('12 SEP 26', 9);
     fixed('00:00:00', 8);
-    fixed('GoHow Research prepared dataset', 64);
+    fixed('Go-How RS prepared dataset', 64);
     out.add([0, 0, 0]);
     final indices = <int>[];
     var slot = 1;

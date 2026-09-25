@@ -457,7 +457,7 @@ class DashboardScreen extends ConsumerWidget {
                                     color: Colors.amber, size: 28),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'GoHow Research-Sync',
+                                  'Go-How RS-Sync',
                                   style: GoogleFonts.poppins(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,

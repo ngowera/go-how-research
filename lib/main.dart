@@ -28,7 +28,7 @@ Future<void> main() async {
         size: Size(1280, 800),
         minimumSize: Size(900, 600),
         center: true,
-        title: 'GoHow Research',
+        title: 'Go-How RS',
         backgroundColor: Colors.transparent,
         skipTaskbar: false,
         titleBarStyle: TitleBarStyle.normal,

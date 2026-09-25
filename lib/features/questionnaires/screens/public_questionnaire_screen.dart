@@ -156,7 +156,7 @@ class _PublicQuestionnaireScreenState extends State<PublicQuestionnaireScreen> {
     final visible = _visible;
     return Scaffold(
       appBar: AppBar(
-          title: const Text('GoHow Research'),
+          title: const Text('Go-How RS'),
           automaticallyImplyLeading: false),
       body: Center(
           child: ConstrainedBox(

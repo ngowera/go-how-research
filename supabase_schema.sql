@@ -1,4 +1,4 @@
--- GoHow Research — complete Supabase setup
+-- Go-How RS — complete Supabase setup
 -- Paste this whole file into Dashboard > SQL Editor, then Run.
 begin;
 create schema if not exists private;

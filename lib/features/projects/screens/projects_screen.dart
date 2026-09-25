@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/app_models.dart';
-import '../../../core/database/app_database.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/billing_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'create_project_dialog.dart';
@@ -36,111 +36,158 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isPhone = constraints.maxWidth < 600;
+          return Padding(
+            padding: EdgeInsets.all(isPhone ? 16 : 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Research Projects',
-                      style: GoogleFonts.poppins(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
+                // Top Bar
+                isPhone
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildPageHeading(),
+                          const SizedBox(height: 14),
+                          _buildNewProjectButton(),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildPageHeading(),
+                          _buildNewProjectButton(),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Manage your academic studies, objectives and teams',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => const CreateProjectDialog(),
-                    );
-                  },
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('New Project'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.kPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 14),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // Search and filters
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search projects by title or keywords...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade200),
-                      ),
-                    ),
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                _buildFilterChip(null, 'All'),
-                const SizedBox(width: 8),
-                _buildFilterChip(ResearchStatus.active, 'Active'),
-                const SizedBox(width: 8),
-                _buildFilterChip(ResearchStatus.draft, 'Draft'),
-                const SizedBox(width: 8),
-                _buildFilterChip(ResearchStatus.completed, 'Completed'),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Project Grid
-            Expanded(
-              child: state.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filtered.isEmpty
-                      ? _buildEmptyState()
-                      : GridView.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 1.25,
-                            crossAxisSpacing: 18,
-                            mainAxisSpacing: 18,
+                // Search and filters
+                isPhone
+                    ? Column(
+                        children: [
+                          _buildSearchField(),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildFilterChip(null, 'All'),
+                              _buildFilterChip(ResearchStatus.active, 'Active'),
+                              _buildFilterChip(ResearchStatus.draft, 'Draft'),
+                              _buildFilterChip(
+                                  ResearchStatus.completed, 'Completed'),
+                            ],
                           ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, idx) {
-                            return _buildProjectCard(filtered[idx]);
-                          },
-                        ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: _buildSearchField()),
+                          const SizedBox(width: 16),
+                          _buildFilterChip(null, 'All'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(ResearchStatus.active, 'Active'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(ResearchStatus.draft, 'Draft'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(
+                              ResearchStatus.completed, 'Completed'),
+                        ],
+                      ),
+                const SizedBox(height: 24),
+
+                // Project Grid
+                Expanded(
+                  child: state.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : state.error != null
+                          ? _buildErrorState(state.error!)
+                          : filtered.isEmpty
+                              ? _buildEmptyState()
+                              : LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final columns = constraints.maxWidth >= 1100
+                                        ? 3
+                                        : constraints.maxWidth >= 700
+                                            ? 2
+                                            : 1;
+                                    return GridView.builder(
+                                      gridDelegate:
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: columns,
+                                        childAspectRatio:
+                                            columns == 1 ? 2.2 : 1.25,
+                                        crossAxisSpacing: 18,
+                                        mainAxisSpacing: 18,
+                                      ),
+                                      itemCount: filtered.length,
+                                      itemBuilder: (context, idx) {
+                                        return _buildProjectCard(filtered[idx]);
+                                      },
+                                    );
+                                  },
+                                ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
+
+  Widget _buildPageHeading() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Research Projects',
+              style: GoogleFonts.poppins(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B))),
+          const SizedBox(height: 4),
+          Text('Manage your academic studies, objectives and teams',
+              style: GoogleFonts.poppins(
+                  fontSize: 14, color: Colors.grey.shade600)),
+        ],
+      );
+
+  Widget _buildNewProjectButton() => ElevatedButton.icon(
+        onPressed: () {
+          final billing = ref.read(billingProvider);
+          final count = ref.read(projectsProvider).projects.length;
+          if (!billing.hasUnlimitedProjects && count >= 2) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text(
+                    'Free accounts can create up to 2 projects. Upgrade in Settings to continue.')));
+            return;
+          }
+          showDialog(
+              context: context, builder: (_) => const CreateProjectDialog());
+        },
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New Project'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.kPrimary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        ),
+      );
+
+  Widget _buildSearchField() => TextField(
+        decoration: InputDecoration(
+          hintText: 'Search projects by title or keywords...',
+          prefixIcon: const Icon(Icons.search_rounded),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+        ),
+        onChanged: (v) => setState(() => _searchQuery = v),
+      );
 
   Widget _buildFilterChip(ResearchStatus? status, String label) {
     final isSelected = _statusFilter == status;
@@ -150,7 +197,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       onSelected: (selected) {
         setState(() => _statusFilter = selected ? status : null);
       },
-      selectedColor: AppTheme.kPrimary.withOpacity(0.15),
+      selectedColor: AppTheme.kPrimary.withValues(alpha: 0.15),
       labelStyle: GoogleFonts.poppins(
         color: isSelected ? AppTheme.kPrimary : Colors.grey.shade700,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -187,6 +234,69 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     );
   }
 
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                size: 56, color: Colors.redAccent),
+            const SizedBox(height: 16),
+            Text('Projects could not be loaded',
+                style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700)),
+            const SizedBox(height: 8),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  ref.read(projectsProvider.notifier).loadProjects(),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteProject(ResearchProject project) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded,
+            color: Colors.redAccent, size: 36),
+        title: const Text('Delete this project?'),
+        content: Text(
+          'Are you sure you want to permanently delete “${project.title}”? '
+          'Its questionnaires, collected responses and participants will also be deleted. '
+          'This action cannot be recovered.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_forever_rounded),
+            label: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await ref.read(projectsProvider.notifier).deleteProject(project.id);
+    }
+  }
+
   Widget _buildProjectCard(ResearchProject project) {
     final currentUserId = ref.read(currentUserProvider)?.id;
     final isOwner = project.ownerId == currentUserId;
@@ -217,7 +327,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -249,7 +359,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -261,42 +371,29 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                           ),
                         ),
                       ),
-                      FutureBuilder<String?>(
-                        future: ref
-                            .read(databaseProvider)
-                            .getProjectMembershipRole(project.id),
-                        builder: (context, snapshot) {
-                          final role = snapshot.data;
-                          if (role == null) return const SizedBox.shrink();
-                          final label = switch (role) {
-                            'studentCollaborator' => 'COLLABORATOR',
-                            'fieldEnumerator' => 'ENUMERATOR',
-                            'ethicsReviewer' => 'ETHICS',
-                            _ => role.toUpperCase(),
-                          };
-                          return Container(
-                            margin: const EdgeInsets.only(left: 6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00897B).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
+                      if (!isOwner)
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFF00897B).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'SHARED',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF00897B),
                             ),
-                            child: Text(
-                              'SHARED • $label',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF00897B),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
                       if (isOwner)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert_rounded, size: 18),
-                          onSelected: (val) {
+                          onSelected: (val) async {
                             if (val == 'duplicate') {
                               ref
                                   .read(projectsProvider.notifier)
@@ -311,9 +408,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                                   .read(projectsProvider.notifier)
                                   .archiveProject(project.id);
                             } else if (val == 'delete') {
-                              ref
-                                  .read(projectsProvider.notifier)
-                                  .deleteProject(project.id);
+                              await _confirmDeleteProject(project);
                             }
                           },
                           itemBuilder: (_) => [
@@ -363,7 +458,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       color: Colors.grey.shade600,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
                   const Divider(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

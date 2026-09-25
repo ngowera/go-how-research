@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/app_settings_provider.dart';
+import '../../../core/providers/billing_provider.dart';
 import '../../../core/providers/participants_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
@@ -46,6 +47,7 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
 
     final responses = responsesState?.responses ?? [];
     final settings = ref.watch(appSettingsProvider);
+    final billing = ref.watch(billingProvider);
     final participantNames = {
       for (final participant in ref.watch(participantsProvider).participants)
         if (participant.projectId == widget.projectId &&
@@ -106,6 +108,13 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                       onPressed: responses.isEmpty
                           ? null
                           : () async {
+                              if (!billing.hasExports) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Data exports require the Pro plan.')));
+                                return;
+                              }
                               final csvString = ExportUtils.toCSV(
                                   responses, questions,
                                   participantNames:
@@ -125,6 +134,13 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                       onPressed: responses.isEmpty
                           ? null
                           : () async {
+                              if (!billing.hasExports) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Excel and SPSS exports require the Pro plan.')));
+                                return;
+                              }
                               final bytes = ExportUtils.toExcel(
                                 responses,
                                 questions,
@@ -153,10 +169,22 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                     FilledButton.tonalIcon(
                       onPressed: responses.isEmpty
                           ? null
-                          : () => showDialog(
-                              context: context,
-                              builder: (_) => ExportDialog(
-                                  questions: questions, responses: responses)),
+                          : () {
+                              if (!billing.hasExports) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Excel and SPSS exports require the Pro plan.')));
+                                return;
+                              }
+                              showDialog<void>(
+                                context: context,
+                                builder: (_) => ExportDialog(
+                                  questions: questions,
+                                  responses: responses,
+                                ),
+                              );
+                            },
                       icon: const Icon(Icons.science_outlined, size: 18),
                       label: const Text('Analysis export: Excel / SPSS'),
                     ),

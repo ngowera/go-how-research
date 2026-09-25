@@ -45,14 +45,18 @@ class ResearchAssistantButton extends StatelessWidget {
   Widget build(BuildContext context) => FloatingActionButton(
         heroTag: 'research-assistant',
         tooltip: 'Open Research Assistant',
-        backgroundColor: const Color(0xFF4B2A1D),
-        foregroundColor: const Color(0xFFFFF4EA),
+        backgroundColor: Colors.transparent,
         elevation: 10,
         shape: const CircleBorder(),
         onPressed: () => _openPanel(context),
-        child: const Text(
-          'RA',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        child: ClipOval(
+          child: Image.asset(
+            'kuphanda.png',
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            semanticLabel: 'Research Assistant',
+          ),
         ),
       );
 }
@@ -202,11 +206,13 @@ class _ResearchAssistantPanelState
                                     color: cream.withValues(alpha: 0.28),
                                   ),
                                 ),
-                                child: const Text(
-                                  'RA',
-                                  style: TextStyle(
-                                    color: cream,
-                                    fontWeight: FontWeight.w800,
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'kuphanda.png',
+                                    width: 38,
+                                    height: 38,
+                                    fit: BoxFit.cover,
+                                    semanticLabel: 'Research Assistant',
                                   ),
                                 ),
                               ),
@@ -224,7 +230,7 @@ class _ResearchAssistantPanelState
                                       ),
                                     ),
                                     Text(
-                                      'Ask about your projects and synced findings',
+                                      'AI support for your research',
                                       style: TextStyle(
                                         color: mutedCream,
                                         fontSize: 11,
@@ -246,63 +252,80 @@ class _ResearchAssistantPanelState
                               ),
                             ],
                           ),
-                          Material(
-                            color: cream.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: const Text(
-                                'Use Research Assistant for confirmation only, and double-check its responses.',
-                                style: TextStyle(color: mutedCream),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          DropdownButtonFormField<String>(
-                            initialValue: projectId ?? '',
-                            isExpanded: true,
-                            dropdownColor: const Color(0xFF4B2A1D),
-                            style: const TextStyle(color: cream),
-                            decoration: InputDecoration(
-                              labelText: 'Research context',
-                              labelStyle: const TextStyle(color: mutedCream),
-                              filled: true,
-                              fillColor: cream.withValues(alpha: 0.08),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            items: [
-                              const DropdownMenuItem(
-                                value: '',
-                                child: Text('All my projects'),
-                              ),
-                              ...projects.map(
-                                (p) => DropdownMenuItem(
-                                  value: p.id,
-                                  child: Text(
-                                    p.title,
-                                    overflow: TextOverflow.ellipsis,
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: projectId ?? '',
+                                  isExpanded: true,
+                                  dropdownColor: const Color(0xFF4B2A1D),
+                                  style: const TextStyle(color: cream),
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(
+                                      Icons.folder_open_outlined,
+                                      color: mutedCream,
+                                      size: 19,
+                                    ),
+                                    labelText: 'Project context',
+                                    labelStyle:
+                                        const TextStyle(color: mutedCream),
+                                    filled: true,
+                                    fillColor: cream.withValues(alpha: 0.08),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                   ),
+                                  items: [
+                                    const DropdownMenuItem(
+                                      value: '',
+                                      child: Text('All projects'),
+                                    ),
+                                    ...projects.map(
+                                      (p) => DropdownMenuItem(
+                                        value: p.id,
+                                        child: Text(
+                                          p.title,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: busy
+                                      ? null
+                                      : (v) => setState(() {
+                                            projectId = v == '' ? null : v;
+                                            messages.clear();
+                                            coverage = null;
+                                            error = null;
+                                          }),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message:
+                                    'Uses synced numeric and categorical summaries only. Verify important conclusions.',
+                                child: IconButton(
+                                  onPressed: () => showDialog<void>(
+                                    context: context,
+                                    builder: (context) => const AlertDialog(
+                                      title: Text('About Research Assistant'),
+                                      content: Text(
+                                        'Research Assistant helps researchers with study design, questionnaires and interpreting findings. It uses synced study details and numeric or categorical summaries. Names, contacts and free-text answers are excluded. Verify important conclusions before reporting them.',
+                                      ),
+                                    ),
+                                  ),
+                                  color: mutedCream,
+                                  icon: const Icon(Icons.info_outline),
                                 ),
                               ),
                             ],
-                            onChanged: busy
-                                ? null
-                                : (v) => setState(() {
-                                      projectId = v == '' ? null : v;
-                                      messages.clear();
-                                      coverage = null;
-                                      error = null;
-                                    }),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'Uses synced study details and numeric/category summaries. Names, contacts and free-text answers are excluded. Unsynced changes are not included.',
-                              style: TextStyle(color: mutedCream, fontSize: 12),
-                            ),
-                          ),
+                          const SizedBox(height: 8),
                           Expanded(
                             child: ListView(
                               controller: scroll,
@@ -312,18 +335,33 @@ class _ResearchAssistantPanelState
                                     'Ask about your study, questionnaire or findings.',
                                     style: TextStyle(color: cream),
                                   ),
-                                  ...[
-                                    'What is missing from my study design?',
-                                    'Explain the main patterns in my data.',
-                                    'Which statistical test fits my research questions?',
-                                  ].map(
-                                    (s) => TextButton(
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: mutedCream,
-                                      ),
-                                      onPressed: () => input.text = s,
-                                      child: Text(s),
-                                    ),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      'What is missing from my study design?',
+                                      'Explain the main patterns in my data.',
+                                      'Which statistical test fits my research questions?',
+                                    ]
+                                        .map(
+                                          (s) => ActionChip(
+                                            backgroundColor:
+                                                cream.withValues(alpha: 0.10),
+                                            side: BorderSide(
+                                              color:
+                                                  cream.withValues(alpha: 0.18),
+                                            ),
+                                            label: Text(
+                                              s,
+                                              style: const TextStyle(
+                                                color: mutedCream,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                            onPressed: () => input.text = s,
+                                          ),
+                                        )
+                                        .toList(),
                                   ),
                                 ],
                                 ...messages.map(
@@ -390,7 +428,7 @@ class _ResearchAssistantPanelState
                                   minLines: 1,
                                   maxLength: 4000,
                                   decoration: InputDecoration(
-                                    hintText: 'Ask RA',
+                                    hintText: 'Ask Research Assistant',
                                     hintStyle: const TextStyle(
                                       color: mutedCream,
                                     ),
@@ -423,6 +461,12 @@ class _ResearchAssistantPanelState
                                     counterText: '',
                                   ),
                                   style: const TextStyle(color: cream),
+                                  textInputAction: TextInputAction.send,
+                                  onChanged: (value) {
+                                    // Desktop Enter inserts a newline in a
+                                    // multi-line field, so submit it here too.
+                                    if (value.endsWith('\n')) send();
+                                  },
                                   onSubmitted: (_) => send(),
                                 ),
                               ),

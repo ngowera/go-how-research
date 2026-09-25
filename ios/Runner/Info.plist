@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Gohow Research</string>
+	<string>Go-How RS</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Go-How RS uses the camera to capture project evidence.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Go-How RS uses the microphone to record interviews and short videos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Go-How RS lets you attach photos and videos to your research projects.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

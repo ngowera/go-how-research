@@ -184,7 +184,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 if (!ref.read(interviewRecordingProvider)) return true;
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text(
-                        'Stop and save the recording before leaving Interviews.')));
+                        'Stop and save the recording before leaving Data Capture.')));
                 return false;
               },
               builder: (context, state) => const InterviewsScreen()),

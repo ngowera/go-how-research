@@ -86,16 +86,19 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
               const Text('Your profile',
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              InkWell(
-                onTap: busy ? null : _showPhotoActions,
-                customBorder: const CircleBorder(),
-                child: ProfileAvatar(
-                    name: user?.name ?? '', image: user?.avatarUrl, radius: 48),
-              ),
+              Center(
+                  child: InkWell(
+                      onTap: busy ? null : _showPhotoActions,
+                      customBorder: const CircleBorder(),
+                      child: ProfileAvatar(
+                          name: user?.name ?? '',
+                          image: user?.avatarUrl,
+                          radius: 48))),
               const SizedBox(height: 10),
-              Text(user?.name ?? 'Researcher',
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700)),
+              Center(
+                  child: Text(user?.name ?? 'Researcher',
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w700))),
               if (error != null)
                 Text(error!, style: const TextStyle(color: Colors.red)),
               const SizedBox(height: 14),

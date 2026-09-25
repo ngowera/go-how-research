@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/analytics_provider.dart';
 import '../../../core/providers/app_settings_provider.dart';
+import '../../../core/providers/billing_provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
@@ -35,6 +37,17 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
   String? _correlationYId;
   String? _groupVariableId;
   String? _outcomeVariableId;
+  bool _includeMissingInCrossTab = false;
+  bool _showRowPercentages = true;
+  bool _compactPhoneHeader = false;
+
+  String _effectStrength(double value) {
+    final magnitude = value.abs();
+    if (magnitude < .10) return 'negligible';
+    if (magnitude < .30) return 'small';
+    if (magnitude < .50) return 'moderate';
+    return 'large';
+  }
 
   @override
   void initState() {
@@ -50,6 +63,39 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isPhone = MediaQuery.sizeOf(context).width < 600;
+    final billing = ref.watch(billingProvider);
+    if (billing.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!billing.hasAnalytics) {
+      return Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.lock_outline_rounded,
+                    size: 56, color: AppTheme.kPrimary),
+                const SizedBox(height: 16),
+                Text('Analytics is available on Plus',
+                    style: GoogleFonts.poppins(
+                        fontSize: 22, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                const Text(
+                    'Upgrade to Plus for MWK 10,000 per 30 days, or Pro for full exports.',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                FilledButton(
+                    onPressed: () => context.go('/settings'),
+                    child: const Text('View plans in Settings')),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     final project = ref.watch(projectByIdProvider(widget.projectId));
     final analyticsState = ref.watch(analyticsProvider(widget.projectId));
     final questionnairesState = ref.watch(questionnairesProvider);
@@ -90,152 +136,205 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(isPhone ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (allProjects.isNotEmpty) ...[
+            if ((!isPhone || !_compactPhoneHeader) &&
+                allProjects.isNotEmpty) ...[
               _buildProjectSelector(allProjects, activityByProject),
               const SizedBox(height: 18),
             ],
             // Top Nav & Title
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () =>
-                          context.go('/projects/${widget.projectId}'),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            if (!isPhone || !_compactPhoneHeader)
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: isPhone ? double.infinity : null,
+                    child: Row(
                       children: [
-                        Text(
-                          'Statistical Analysis & Analytics',
-                          style: GoogleFonts.poppins(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () =>
+                              context.go('/projects/${widget.projectId}'),
                         ),
-                        Text(
-                          'Project: ${project?.title ?? "Academic Study"} • Automated descriptive & inferential analysis',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Statistical Analysis & Analytics',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                              Text(
+                                'Project: ${project?.title ?? "Academic Study"} • Automated descriptive & inferential analysis',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-                if (questionnaires.isNotEmpty)
-                  Row(
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed:
-                            exportQuestions.isEmpty || exportResponses.isEmpty
-                                ? null
-                                : () => showDialog<void>(
-                                      context: context,
-                                      builder: (_) => ExportDialog(
-                                        questions: exportQuestions,
-                                        responses: exportResponses,
-                                      ),
+                  ),
+                  if (questionnaires.isNotEmpty)
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: exportQuestions.isEmpty ||
+                                  exportResponses.isEmpty
+                              ? null
+                              : () {
+                                  if (!billing.hasExports) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Excel and SPSS exports require the Pro plan.')),
+                                    );
+                                    return;
+                                  }
+                                  showDialog<void>(
+                                    context: context,
+                                    builder: (_) => ExportDialog(
+                                      questions: exportQuestions,
+                                      responses: exportResponses,
                                     ),
-                        icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text('Export Excel / SPSS'),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade300),
+                                  );
+                                },
+                          icon: const Icon(Icons.download_rounded, size: 18),
+                          label: const Text('Export Excel / SPSS'),
                         ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: analyticsState.selectedQuestionnaireId ??
-                                questionnaires.first.id,
-                            items: questionnaires.map((q) {
-                              return DropdownMenuItem(
-                                value: q.id,
-                                child: Text(
-                                  q.title,
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500),
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                ref
-                                    .read(analyticsProvider(widget.projectId)
-                                        .notifier)
-                                    .loadAnalyticsForQuestionnaire(val);
-                              }
-                            },
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: isPhone,
+                              value: analyticsState.selectedQuestionnaireId ??
+                                  questionnaires.first.id,
+                              items: questionnaires.map((q) {
+                                return DropdownMenuItem(
+                                  value: q.id,
+                                  child: Text(q.title,
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500)),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  ref
+                                      .read(analyticsProvider(widget.projectId)
+                                          .notifier)
+                                      .loadAnalyticsForQuestionnaire(val);
+                                }
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
+                      ],
+                    ),
+                ],
+              ),
+            if (!isPhone || !_compactPhoneHeader) const SizedBox(height: 20),
 
             // Metrics Row (Data Quality, Completion Rate, Total N)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Data Quality Score',
-                    value: '${analyticsState.qualityScore.toStringAsFixed(1)}%',
-                    icon: Icons.verified_rounded,
-                    color: const Color(0xFF00897B),
-                    bg: const Color(0xFFE0F2F1),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Form Completion Rate',
-                    value:
-                        '${analyticsState.completionRate.toStringAsFixed(1)}%',
-                    icon: Icons.task_alt_rounded,
-                    color: const Color(0xFF1565C0),
-                    bg: const Color(0xFFE3F2FD),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Analysed Questions',
-                    value: '${analyticsState.results.length}',
-                    icon: Icons.analytics_rounded,
-                    color: const Color(0xFF7B1FA2),
-                    bg: const Color(0xFFF3E5F5),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Inference Tools',
-                    value: '95% CI • χ²',
-                    icon: Icons.functions_rounded,
-                    color: const Color(0xFFF57C00),
-                    bg: const Color(0xFFFFF3E0),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+            if (!isPhone || !_compactPhoneHeader)
+              isPhone
+                  ? GridView.count(
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.35,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildMetricCard(
+                          title: 'Data Quality Score',
+                          value:
+                              '${analyticsState.qualityScore.toStringAsFixed(1)}%',
+                          icon: Icons.verified_rounded,
+                          color: const Color(0xFF00897B),
+                          bg: const Color(0xFFE0F2F1),
+                        ),
+                        _buildMetricCard(
+                          title: 'Form Completion Rate',
+                          value:
+                              '${analyticsState.completionRate.toStringAsFixed(1)}%',
+                          icon: Icons.task_alt_rounded,
+                          color: const Color(0xFF1565C0),
+                          bg: const Color(0xFFE3F2FD),
+                        ),
+                        _buildMetricCard(
+                          title: 'Analysed Questions',
+                          value: '${analyticsState.results.length}',
+                          icon: Icons.analytics_rounded,
+                          color: const Color(0xFF7B1FA2),
+                          bg: const Color(0xFFF3E5F5),
+                        ),
+                        _buildMetricCard(
+                          title: 'Inference Tools',
+                          value: '95% CI • χ²',
+                          icon: Icons.functions_rounded,
+                          color: const Color(0xFFF57C00),
+                          bg: const Color(0xFFFFF3E0),
+                        ),
+                      ],
+                    )
+                  : Row(children: [
+                      Expanded(
+                          child: _buildMetricCard(
+                              title: 'Data Quality Score',
+                              value:
+                                  '${analyticsState.qualityScore.toStringAsFixed(1)}%',
+                              icon: Icons.verified_rounded,
+                              color: const Color(0xFF00897B),
+                              bg: const Color(0xFFE0F2F1))),
+                      const SizedBox(width: 14),
+                      Expanded(
+                          child: _buildMetricCard(
+                              title: 'Form Completion Rate',
+                              value:
+                                  '${analyticsState.completionRate.toStringAsFixed(1)}%',
+                              icon: Icons.task_alt_rounded,
+                              color: const Color(0xFF1565C0),
+                              bg: const Color(0xFFE3F2FD))),
+                      const SizedBox(width: 14),
+                      Expanded(
+                          child: _buildMetricCard(
+                              title: 'Analysed Questions',
+                              value: '${analyticsState.results.length}',
+                              icon: Icons.analytics_rounded,
+                              color: const Color(0xFF7B1FA2),
+                              bg: const Color(0xFFF3E5F5))),
+                      const SizedBox(width: 14),
+                      Expanded(
+                          child: _buildMetricCard(
+                              title: 'Inference Tools',
+                              value: '95% CI • χ²',
+                              icon: Icons.functions_rounded,
+                              color: const Color(0xFFF57C00),
+                              bg: const Color(0xFFFFF3E0))),
+                    ]),
+            if (!isPhone || !_compactPhoneHeader) const SizedBox(height: 20),
 
             // Tab Bar
             Container(
@@ -245,6 +344,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
               ),
               child: TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 labelColor: AppTheme.kPrimary,
                 unselectedLabelColor: Colors.grey.shade600,
                 indicatorColor: AppTheme.kPrimary,
@@ -270,64 +371,78 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
 
             // Tab Views
             Expanded(
-              child: analyticsState.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : analyticsState.results.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.insert_chart_outlined_rounded,
-                                  size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 14),
-                              Text(
-                                'No responses collected yet for analysis',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Fill out questionnaire responses to generate automated statistics and charts.',
-                                style: GoogleFonts.poppins(
-                                    color: Colors.grey.shade500),
-                              ),
-                              const SizedBox(height: 16),
-                              if (analyticsState.selectedQuestionnaireId !=
-                                  null)
-                                ElevatedButton.icon(
-                                  onPressed: () => context.go(
-                                      '/data-collection/${analyticsState.selectedQuestionnaireId}'),
-                                  icon: const Icon(Icons.play_circle_outline),
-                                  label: const Text('Collect Responses Now'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.kPrimary,
-                                    foregroundColor: Colors.white,
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: (notification) {
+                  if (!isPhone ||
+                      notification.direction == ScrollDirection.idle) {
+                    return false;
+                  }
+                  final compact =
+                      notification.direction == ScrollDirection.reverse;
+                  if (compact != _compactPhoneHeader) {
+                    setState(() => _compactPhoneHeader = compact);
+                  }
+                  return false;
+                },
+                child: analyticsState.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : analyticsState.results.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.insert_chart_outlined_rounded,
+                                    size: 64, color: Colors.grey.shade400),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'No responses collected yet for analysis',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
                                   ),
                                 ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Fill out questionnaire responses to generate automated statistics and charts.',
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.grey.shade500),
+                                ),
+                                const SizedBox(height: 16),
+                                if (analyticsState.selectedQuestionnaireId !=
+                                    null)
+                                  ElevatedButton.icon(
+                                    onPressed: () => context.go(
+                                        '/data-collection/${analyticsState.selectedQuestionnaireId}'),
+                                    icon: const Icon(Icons.play_circle_outline),
+                                    label: const Text('Collect Responses Now'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.kPrimary,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )
+                        : TabBarView(
+                            controller: _tabController,
+                            children: [
+                              // 1. Descriptive statistics list
+                              _buildDescriptiveTab(analyticsState.results),
+
+                              // 2. Charts view
+                              _buildChartsTab(analyticsState.results),
+
+                              // 3. Cross-Tabulation
+                              _buildCrossTabTab(analyticsState.results,
+                                  analyticsState.selectedQuestionnaireId),
+
+                              // 4. Correlation and group comparisons
+                              _buildAdvancedTestsTab(analyticsState.results,
+                                  analyticsState.selectedQuestionnaireId),
                             ],
                           ),
-                        )
-                      : TabBarView(
-                          controller: _tabController,
-                          children: [
-                            // 1. Descriptive statistics list
-                            _buildDescriptiveTab(analyticsState.results),
-
-                            // 2. Charts view
-                            _buildChartsTab(analyticsState.results),
-
-                            // 3. Cross-Tabulation
-                            _buildCrossTabTab(analyticsState.results,
-                                analyticsState.selectedQuestionnaireId),
-
-                            // 4. Correlation and group comparisons
-                            _buildAdvancedTestsTab(analyticsState.results,
-                                analyticsState.selectedQuestionnaireId),
-                          ],
-                        ),
+              ),
             ),
           ],
         ),
@@ -706,34 +821,57 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
 
   Widget _buildCrossTabTab(
       List<AnalyticsResult> results, String? questionnaireId) {
-    if (results.length < 2) {
+    final categorical = results
+        .where((result) => const {
+              QuestionType.singleChoice,
+              QuestionType.yesNo,
+              QuestionType.thumbs,
+              QuestionType.likertScale,
+              QuestionType.rating,
+            }.contains(result.type))
+        .toList();
+    if (categorical.length < 2) {
       return Center(
         child: Text(
-          'At least 2 questions are required to compute a cross-tabulation table.',
+          'Add at least two categorical, Likert, rating, yes/no or like/dislike questions to run a cross-tabulation.',
           style: GoogleFonts.poppins(color: Colors.grey.shade600),
         ),
       );
     }
 
-    _crossTabRowQId ??= results.first.questionId;
-    _crossTabColQId ??= results[1].questionId;
+    if (!categorical.any((r) => r.questionId == _crossTabRowQId)) {
+      _crossTabRowQId = categorical.first.questionId;
+    }
+    if (!categorical.any((r) => r.questionId == _crossTabColQId) ||
+        _crossTabColQId == _crossTabRowQId) {
+      _crossTabColQId = categorical[1].questionId;
+    }
 
-    final rowQ = results.firstWhere((r) => r.questionId == _crossTabRowQId,
-        orElse: () => results.first);
-    final colQ = results.firstWhere((r) => r.questionId == _crossTabColQId,
-        orElse: () => results[1]);
+    final rowQ = categorical.firstWhere((r) => r.questionId == _crossTabRowQId,
+        orElse: () => categorical.first);
+    final colQ = categorical.firstWhere((r) => r.questionId == _crossTabColQId,
+        orElse: () => categorical[1]);
 
     final responsesState = questionnaireId != null
         ? ref.watch(responsesProvider(questionnaireId))
         : null;
     final allResponses = responsesState?.responses ?? [];
 
-    final rowVals = allResponses
-        .map((r) => r.responses[rowQ.questionId]?.toString() ?? '(Empty)')
-        .toList();
-    final colVals = allResponses
-        .map((r) => r.responses[colQ.questionId]?.toString() ?? '(Empty)')
-        .toList();
+    final rowVals = <String>[];
+    final colVals = <String>[];
+    var excludedMissing = 0;
+    for (final response in allResponses) {
+      final row = response.responses[rowQ.questionId]?.toString().trim();
+      final column = response.responses[colQ.questionId]?.toString().trim();
+      final missing =
+          row == null || row.isEmpty || column == null || column.isEmpty;
+      if (missing && !_includeMissingInCrossTab) {
+        excludedMissing++;
+        continue;
+      }
+      rowVals.add(row == null || row.isEmpty ? '(Missing)' : row);
+      colVals.add(column == null || column.isEmpty ? '(Missing)' : column);
+    }
 
     final crossTable = StatisticsUtils.crossTabulate(rowVals, colVals);
     final chiResult = StatisticsUtils.chiSquareTest(crossTable);
@@ -776,56 +914,94 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey.shade200),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Row Variable (X)',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: _crossTabRowQId,
-                        items: results.map((r) {
-                          return DropdownMenuItem(
-                            value: r.questionId,
-                            child: Text(r.questionText,
-                                overflow: TextOverflow.ellipsis),
-                          );
-                        }).toList(),
-                        onChanged: (v) => setState(() => _crossTabRowQId = v),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Column Variable (Y)',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: _crossTabColQId,
-                        items: results.map((r) {
-                          return DropdownMenuItem(
-                            value: r.questionId,
-                            child: Text(r.questionText,
-                                overflow: TextOverflow.ellipsis),
-                          );
-                        }).toList(),
-                        onChanged: (v) => setState(() => _crossTabColQId = v),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isPhone = constraints.maxWidth < 600;
+                final selector = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Row Variable (X)',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    DropdownButton<String>(
+                      isExpanded: true,
+                      value: _crossTabRowQId,
+                      items: categorical
+                          .map((r) => DropdownMenuItem(
+                                value: r.questionId,
+                                child: Text(r.questionText,
+                                    overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _crossTabRowQId = v),
+                    ),
+                  ],
+                );
+                final columnSelector = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Column Variable (Y)',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    DropdownButton<String>(
+                      isExpanded: true,
+                      value: _crossTabColQId,
+                      items: categorical
+                          .map((r) => DropdownMenuItem(
+                                value: r.questionId,
+                                child: Text(r.questionText,
+                                    overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _crossTabColQId = v),
+                    ),
+                  ],
+                );
+                final options = Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    FilterChip(
+                        label: const Text('Show row percentages'),
+                        selected: _showRowPercentages,
+                        onSelected: (value) =>
+                            setState(() => _showRowPercentages = value)),
+                    FilterChip(
+                        label: const Text('Include missing answers'),
+                        selected: _includeMissingInCrossTab,
+                        onSelected: (value) =>
+                            setState(() => _includeMissingInCrossTab = value)),
+                    Text(
+                        '${rowVals.length} complete records${excludedMissing > 0 ? ' • $excludedMissing excluded for missing data' : ''}',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.grey.shade700)),
+                  ],
+                );
+                if (isPhone) {
+                  return Column(children: [
+                    selector,
+                    const SizedBox(height: 12),
+                    columnSelector,
+                    const SizedBox(height: 12),
+                    Align(alignment: Alignment.centerLeft, child: options)
+                  ]);
+                }
+                return Row(
+                  children: [
+                    Expanded(
+                      child: selector,
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: columnSelector,
+                    ),
+                    const SizedBox(height: 10),
+                    options,
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 18),
@@ -852,43 +1028,53 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
                 const SizedBox(height: 14),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    border: TableBorder.all(color: Colors.grey.shade200),
-                    headingRowColor:
-                        MaterialStateProperty.all(const Color(0xFFF1F5F9)),
-                    columns: [
-                      DataColumn(
-                          label: Text(
-                              '${rowQ.questionText.split(' ').first} \\ ${colQ.questionText.split(' ').first}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700))),
-                      ...colList.map((c) => DataColumn(
-                          label: Text(c,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700)))),
-                      const DataColumn(
-                          label: Text('Row Total',
-                              style: TextStyle(fontWeight: FontWeight.w700))),
-                    ],
-                    rows: rowKeys.map((r) {
-                      int rowTotal = 0;
-                      return DataRow(
-                        cells: [
-                          DataCell(Text(r,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600))),
-                          ...colList.map((c) {
-                            final count = crossTable[r]?[c] ?? 0;
-                            rowTotal += count;
-                            return DataCell(Text('$count'));
-                          }),
-                          DataCell(Text('$rowTotal',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold))),
+                  child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 700),
+                      child: DataTable(
+                        border: TableBorder.all(color: Colors.grey.shade200),
+                        headingRowColor:
+                            MaterialStateProperty.all(const Color(0xFFF1F5F9)),
+                        columns: [
+                          DataColumn(
+                              label: Text(
+                                  '${rowQ.questionText.split(' ').first} \\ ${colQ.questionText.split(' ').first}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700))),
+                          ...colList.map((c) => DataColumn(
+                              label: Text(c,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700)))),
+                          const DataColumn(
+                              label: Text('Row Total',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w700))),
                         ],
-                      );
-                    }).toList(),
-                  ),
+                        rows: rowKeys.map((r) {
+                          int rowTotal = 0;
+                          return DataRow(
+                            cells: [
+                              DataCell(Text(r,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600))),
+                              ...colList.map((c) {
+                                final count = crossTable[r]?[c] ?? 0;
+                                rowTotal += count;
+                                final total = crossTable[r]?.values.fold<int>(
+                                        0, (sum, value) => sum + value) ??
+                                    0;
+                                final percentage =
+                                    total == 0 ? 0.0 : (count / total) * 100;
+                                return DataCell(Text(_showRowPercentages
+                                    ? '$count (${percentage.toStringAsFixed(1)}%)'
+                                    : '$count'));
+                              }),
+                              DataCell(Text('$rowTotal',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold))),
+                            ],
+                          );
+                        }).toList(),
+                      )),
                 ),
                 const SizedBox(height: 20),
                 const Divider(),
@@ -925,10 +1111,16 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
                   style: GoogleFonts.poppins(
                       fontSize: 12, color: Colors.grey.shade700),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Interpretation: ${_interpretPValue(chiResult['pValue'] ?? 1)}. The association is ${_effectStrength(chiResult['cramerV'] ?? 0)} in magnitude; this does not establish causation.',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, fontWeight: FontWeight.w600),
+                ),
                 if ((chiResult['cellsBelowFive'] ?? 0) > 0) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Caution: ${chiResult['cellsBelowFive']?.toInt()} of ${chiResult['totalCells']?.toInt()} cells have expected counts below 5. Consider combining categories or using an exact test.',
+                    'Assumption warning: ${chiResult['cellsBelowFive']?.toInt()} of ${chiResult['totalCells']?.toInt()} cells have expected counts below 5. If more than 20% of cells are affected, combine defensible categories or report that chi-square may be unreliable. For a 2×2 table with small counts, use Fisher’s exact test in specialist software.',
                     style: GoogleFonts.poppins(
                         fontSize: 12, color: Colors.orange.shade900),
                   ),
@@ -981,7 +1173,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         .toList();
     final categorical = results
         .where((r) =>
-            r.type == QuestionType.singleChoice || r.type == QuestionType.yesNo)
+            r.type == QuestionType.singleChoice ||
+            r.type == QuestionType.yesNo ||
+            r.type == QuestionType.thumbs)
         .toList();
     if (questionnaireId == null) return const SizedBox.shrink();
     final responses = ref.watch(responsesProvider(questionnaireId)).responses;
@@ -1065,7 +1259,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         ]),
         result: numeric.length < 2
             ? 'Add at least two numeric questions.'
-            : 'r = ${correlation?['r']?.toStringAsFixed(3) ?? 'N/A'} • n = ${correlation?['n']?.toInt() ?? 0} • ${_interpretPValue(correlation?['pValue'] ?? 1)}',
+            : 'r = ${correlation?['r']?.toStringAsFixed(3) ?? 'N/A'} • n = ${correlation?['n']?.toInt() ?? 0} • ${_interpretPValue(correlation?['pValue'] ?? 1)} • ${_effectStrength(correlation?['r'] ?? 0)} linear relationship\nCheck the scatter plot for outliers and curvature. Correlation does not imply causation.',
       ),
       const SizedBox(height: 16),
       _analysisPanel(
@@ -1083,7 +1277,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         ]),
         result: tTest == null || (tTest['pValue']?.isNaN ?? true)
             ? 'Select a categorical variable containing exactly two groups and a numeric outcome; each group needs at least two observations.'
-            : '${groupNames[0]} mean = ${tTest['mean1']?.toStringAsFixed(ref.watch(appSettingsProvider).decimalPrecision)} (n=${tTest['n1']?.toInt()}) • ${groupNames[1]} mean = ${tTest['mean2']?.toStringAsFixed(ref.watch(appSettingsProvider).decimalPrecision)} (n=${tTest['n2']?.toInt()})\nWelch t = ${tTest['t']?.toStringAsFixed(3)} • df = ${tTest['degreesOfFreedom']?.toStringAsFixed(1)} • Cohen’s d = ${tTest['cohensD']?.toStringAsFixed(3)} • ${_interpretPValue(tTest['pValue']!)}',
+            : '${groupNames[0]} mean = ${tTest['mean1']?.toStringAsFixed(ref.watch(appSettingsProvider).decimalPrecision)} (n=${tTest['n1']?.toInt()}) • ${groupNames[1]} mean = ${tTest['mean2']?.toStringAsFixed(ref.watch(appSettingsProvider).decimalPrecision)} (n=${tTest['n2']?.toInt()})\nWelch t = ${tTest['t']?.toStringAsFixed(3)} • df = ${tTest['degreesOfFreedom']?.toStringAsFixed(1)} • Cohen’s d = ${tTest['cohensD']?.toStringAsFixed(3)} (${_effectStrength(tTest['cohensD'] ?? 0)}) • ${_interpretPValue(tTest['pValue']!)}',
       ),
       const SizedBox(height: 16),
       Text(
@@ -1107,7 +1301,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
           controls: const SizedBox.shrink(),
           result: anova == null || !(anova!['pValue']?.isFinite ?? false)
               ? 'Choose two or more groups, each with at least two numeric observations and nonzero within-group variation.'
-              : 'F=${anova!['f']!.toStringAsFixed(3)} • df=(${anova!['df1']!.toInt()},${anova!['df2']!.toInt()}) • η²=${anova!['etaSquared']!.toStringAsFixed(3)} • ${_interpretPValue(anova!['pValue']!)}'),
+              : 'F=${anova!['f']!.toStringAsFixed(3)} • df=(${anova!['df1']!.toInt()},${anova!['df2']!.toInt()}) • η²=${anova!['etaSquared']!.toStringAsFixed(3)} (${_effectStrength(anova!['etaSquared']!)}) • ${_interpretPValue(anova!['pValue']!)}\nA significant overall result means at least one group differs; use a justified post-hoc procedure in specialist software to identify which groups.'),
       const SizedBox(height: 16),
       _analysisPanel(
           title: 'Simple linear regression',
@@ -1117,7 +1311,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
           result: regression == null ||
                   !(regression!['slope']?.isFinite ?? false)
               ? 'Select two nonconstant numeric variables and at least three complete pairs.'
-              : 'Y = ${regression!['intercept']!.toStringAsFixed(3)} + ${regression!['slope']!.toStringAsFixed(3)} × X • R²=${regression!['rSquared']!.toStringAsFixed(3)} • ${_interpretPValue(regression!['pValue']!)}'),
+              : 'Y = ${regression!['intercept']!.toStringAsFixed(3)} + ${regression!['slope']!.toStringAsFixed(3)} × X • R²=${regression!['rSquared']!.toStringAsFixed(3)} (${(regression!['rSquared']! * 100).toStringAsFixed(1)}% of variance explained) • ${_interpretPValue(regression!['pValue']!)}'),
       if (scatter.isNotEmpty) ...[
         const SizedBox(height: 16),
         Text(

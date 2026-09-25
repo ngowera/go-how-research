@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -16,6 +18,7 @@ import '../../core/database/app_database.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/interviews_provider.dart';
 import '../../core/providers/participants_provider.dart';
+import '../../core/providers/project_assets_provider.dart';
 import '../../core/providers/projects_provider.dart';
 import '../../core/providers/sync_provider.dart';
 import '../../core/utils/export_utils.dart';
@@ -29,6 +32,7 @@ class InterviewsScreen extends ConsumerStatefulWidget {
 
 class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
   final recorder = AudioRecorder(), player = AudioPlayer();
+  final imagePicker = ImagePicker();
   final title = TextEditingController();
   final audio = BytesBuilder(copy: false);
   String? projectId, participantId, message, playingId;
@@ -36,6 +40,8 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
   int seconds = 0;
   Map<String, dynamic>? metadata;
   final Set<String> deletingIds = <String>{};
+  final Set<String> deletingAssetIds = <String>{};
+  final Map<String, Future<Uint8List>> imagePreviews = {};
   final Set<String> deletedIds = <String>{};
   Timer? timer;
   StreamSubscription<Uint8List>? subscription;
@@ -171,6 +177,471 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
     if (mounted) ref.invalidate(interviewsProvider);
   }
 
+  bool get _supportsDirectCapture =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  String _extensionFor(String name) {
+    final dot = name.lastIndexOf('.');
+    return dot == -1 ? '' : name.substring(dot + 1).toLowerCase();
+  }
+
+  String? _mimeForExtension(String extension) => {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'mov': 'video/quicktime',
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx':
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }[extension];
+
+  Future<String?> _captureComment(String heading) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(heading),
+        content: TextField(
+          controller: controller,
+          maxLength: 1000,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Comment or field note (optional)',
+            hintText:
+                'Describe what this evidence shows and where it was captured.',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Continue')),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<bool> _withinFreeStorage(int incomingBytes) async {
+    final uid = ref.read(currentUserProvider)?.id;
+    if (uid == null) throw StateError('Sign in to store project evidence.');
+    final existing = await Supabase.instance.client
+        .from('project_assets')
+        .select('byte_size')
+        .eq('owner_id', uid)
+        .neq('status', 'uploading');
+    final used = existing.fold<int>(
+        0, (sum, row) => sum + ((row['byte_size'] as num?)?.toInt() ?? 0));
+    const limit = 10 * 1024 * 1024;
+    if (used + incomingBytes > limit) {
+      notice(
+          'Your free 10 MB Data Capture storage is full. Remove unneeded assets or upgrade your storage plan.');
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _uploadAsset({
+    required Uint8List bytes,
+    required String fileName,
+    required String assetType,
+    required String comment,
+  }) async {
+    final uid = ref.read(currentUserProvider)?.id;
+    if (uid == null || projectId == null) {
+      throw StateError('Select a project before capturing data.');
+    }
+    if (bytes.isEmpty) throw StateError('The selected file is empty.');
+    if (!await _withinFreeStorage(bytes.length)) return;
+    final extension = _extensionFor(fileName);
+    final mime = _mimeForExtension(extension);
+    if (mime == null) throw StateError('This file type is not supported.');
+    final id = const Uuid().v4();
+    final timestamp = DateTime.now().toUtc();
+    final path = '$uid/$projectId/$id.$extension';
+    final row = {
+      'id': id,
+      'project_id': projectId,
+      'owner_id': uid,
+      'asset_type': assetType,
+      'title': fileName,
+      'comment': comment.isEmpty ? null : comment,
+      'storage_path': path,
+      'mime_type': mime,
+      'byte_size': bytes.length,
+      'captured_at': timestamp.toIso8601String(),
+      'status': 'uploading',
+    };
+    setState(() => busy = true);
+    try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentSession == null) {
+        throw StateError('Sign in online to upload project evidence.');
+      }
+      await client.from('project_assets').insert(row);
+      await client.storage.from('project-assets').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: mime, upsert: false),
+          );
+      await client
+          .from('project_assets')
+          .update({'status': 'ready'})
+          .eq('id', id)
+          .eq('owner_id', uid);
+      ref.invalidate(projectAssetsProvider(projectId!));
+      notice(
+          '${assetType[0].toUpperCase()}${assetType.substring(1)} saved with a ${timestamp.toLocal()} timestamp.');
+    } catch (e) {
+      try {
+        await Supabase.instance.client
+            .from('project_assets')
+            .delete()
+            .eq('id', id);
+      } catch (_) {}
+      rethrow;
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _captureImage(ImageSource source) async {
+    try {
+      final file =
+          await imagePicker.pickImage(source: source, imageQuality: 88);
+      if (file == null) return;
+      final comment = await _captureComment('Add a note to this image');
+      if (comment == null) return;
+      await _uploadAsset(
+        bytes: await file.readAsBytes(),
+        fileName: file.name.isEmpty
+            ? 'image_${DateTime.now().millisecondsSinceEpoch}.jpg'
+            : file.name,
+        assetType: 'image',
+        comment: comment,
+      );
+    } catch (e) {
+      notice('Image was not saved: $e');
+    }
+  }
+
+  Future<void> _captureVideo(ImageSource source) async {
+    try {
+      final file = await imagePicker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 7),
+      );
+      if (file == null) return;
+      final comment =
+          await _captureComment('Add a note to this 7-second video');
+      if (comment == null) return;
+      await _uploadAsset(
+        bytes: await file.readAsBytes(),
+        fileName: file.name.isEmpty
+            ? 'video_${DateTime.now().millisecondsSinceEpoch}.mp4'
+            : file.name,
+        assetType: 'video',
+        comment: comment,
+      );
+    } catch (e) {
+      notice('Video was not saved: $e');
+    }
+  }
+
+  Future<void> _importDocument() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx'],
+        withData: true,
+      );
+      if (result.isEmpty) return;
+      final file = result.single;
+      final bytes = await file.readAsBytes();
+      final comment = await _captureComment('Add a note to this document');
+      if (comment == null) return;
+      await _uploadAsset(
+        bytes: bytes,
+        fileName: file.name,
+        assetType: 'document',
+        comment: comment,
+      );
+    } catch (e) {
+      notice('Document was not saved: $e');
+    }
+  }
+
+  Future<void> _deleteAsset(Map<String, dynamic> asset) async {
+    final approved = await confirmDelete(asset['title']?.toString() ?? 'asset',
+        uploaded: true);
+    if (!approved || !mounted) return;
+    final id = asset['id'].toString();
+    setState(() => deletingAssetIds.add(id));
+    try {
+      final client = Supabase.instance.client;
+      await client.storage
+          .from('project-assets')
+          .remove([asset['storage_path'].toString()]);
+      await client.from('project_assets').delete().eq('id', id);
+      ref.invalidate(projectAssetsProvider(projectId!));
+      notice('Project asset deleted.');
+    } catch (e) {
+      notice('Could not delete the project asset: $e');
+    } finally {
+      if (mounted) setState(() => deletingAssetIds.remove(id));
+    }
+  }
+
+  Widget _buildAssetCaptureCard() {
+    final projectSelected = projectId != null && !busy && !recording;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Icon(Icons.perm_media_outlined),
+                Text('Photos, video & documents',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Every item is assigned to the selected project, has a capture timestamp and can include a field note. Free student storage is limited to 10 MB.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (_supportsDirectCapture)
+                  FilledButton.icon(
+                    onPressed: projectSelected
+                        ? () => _captureImage(ImageSource.camera)
+                        : null,
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Take photo'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: projectSelected
+                      ? () => _captureImage(ImageSource.gallery)
+                      : null,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Import image'),
+                ),
+                if (_supportsDirectCapture)
+                  FilledButton.icon(
+                    onPressed: projectSelected
+                        ? () => _captureVideo(ImageSource.camera)
+                        : null,
+                    icon: const Icon(Icons.videocam_outlined),
+                    label: const Text('Record 7-sec video'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: projectSelected
+                      ? () => _captureVideo(ImageSource.gallery)
+                      : null,
+                  icon: const Icon(Icons.video_library_outlined),
+                  label: const Text('Import video'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: projectSelected ? _importDocument : null,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Upload PDF, Word or Excel'),
+                ),
+              ],
+            ),
+            if (projectId == null) ...[
+              const SizedBox(height: 8),
+              const Text(
+                  'Select a project above to capture or upload evidence.',
+                  style: TextStyle(color: Colors.orange)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssetLibrary() {
+    final assets = ref.watch(projectAssetsProvider(projectId!));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text('Project data library',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              tooltip: 'Refresh project assets',
+              onPressed: () =>
+                  ref.invalidate(projectAssetsProvider(projectId!)),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        assets.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (error, _) => Text(
+            'Could not load project assets. Run project_assets_setup.sql and sign in online. $error',
+          ),
+          data: (rows) {
+            if (rows.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(18),
+                child: Text(
+                    'No photos, videos or documents have been saved for this project yet.'),
+              );
+            }
+            return Column(
+              children: rows.map(_buildAssetTile).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAssetTile(Map<String, dynamic> asset) {
+    final type = asset['asset_type']?.toString() ?? 'document';
+    final id = asset['id'].toString();
+    final captured =
+        DateTime.tryParse(asset['captured_at']?.toString() ?? '')?.toLocal();
+    final icon = switch (type) {
+      'image' => Icons.image_outlined,
+      'video' => Icons.videocam_outlined,
+      _ => Icons.description_outlined,
+    };
+    return Card(
+      child: ListTile(
+        leading: type == 'image'
+            ? _buildTimestampedImagePreview(asset, captured)
+            : Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  SizedBox(width: 58, height: 58, child: Icon(icon, size: 34)),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                    color: Colors.black87,
+                    child: const Text('TIMESTAMPED',
+                        style: TextStyle(color: Colors.white, fontSize: 7)),
+                  ),
+                ],
+              ),
+        title: Text(asset['title']?.toString() ?? 'Project asset'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                '${type.toUpperCase()} • ${((asset['byte_size'] as num?)?.toInt() ?? 0) ~/ 1024} KB'),
+            Text('Timestamp: ${captured?.toString() ?? 'Unavailable'}'),
+            if (asset['comment']?.toString().isNotEmpty == true)
+              Text('Note: ${asset['comment']}'),
+          ],
+        ),
+        isThreeLine: true,
+        trailing: Wrap(
+          spacing: 2,
+          children: [
+            IconButton(
+              tooltip: 'Download asset',
+              icon: const Icon(Icons.download_outlined),
+              onPressed: () async {
+                try {
+                  final bytes = await Supabase.instance.client.storage
+                      .from('project-assets')
+                      .download(asset['storage_path'].toString());
+                  await ExportUtils.exportFile(
+                    asset['title'].toString(),
+                    bytes,
+                    mimeType: asset['mime_type'].toString(),
+                    subject: 'Project data capture asset',
+                  );
+                } catch (e) {
+                  notice('Could not download asset: $e');
+                }
+              },
+            ),
+            IconButton(
+              tooltip: 'Delete asset',
+              color: Colors.red.shade700,
+              onPressed: deletingAssetIds.contains(id)
+                  ? null
+                  : () => _deleteAsset(asset),
+              icon: deletingAssetIds.contains(id)
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.delete_outline),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimestampedImagePreview(
+      Map<String, dynamic> asset, DateTime? captured) {
+    final id = asset['id'].toString();
+    final preview = imagePreviews.putIfAbsent(
+      id,
+      () => Supabase.instance.client.storage
+          .from('project-assets')
+          .download(asset['storage_path'].toString()),
+    );
+    return FutureBuilder<Uint8List>(
+      future: preview,
+      builder: (context, snapshot) => ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Stack(
+          alignment: Alignment.bottomLeft,
+          children: [
+            SizedBox(
+              width: 58,
+              height: 58,
+              child: snapshot.hasData
+                  ? Image.memory(snapshot.data!, fit: BoxFit.cover)
+                  : const ColoredBox(
+                      color: Color(0xFFE7EDF5),
+                      child: Icon(Icons.image_outlined),
+                    ),
+            ),
+            Container(
+              width: 58,
+              color: Colors.black87,
+              padding: const EdgeInsets.all(2),
+              child: Text(
+                captured?.toString().substring(0, 16) ?? 'TIMESTAMPED',
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: const TextStyle(color: Colors.white, fontSize: 6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> importAudio() async {
     setState(() => busy = true);
     try {
@@ -210,9 +681,9 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
     final approved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Transcribe with Gemini?'),
+        title: const Text('Transcribe with Research Assistant?'),
         content: const Text(
-          'This sends the interview audio to Google Gemini. Confirm that your study permissions and participant consent cover this use. The transcript will be a draft for you to check against the recording.',
+          'This sends the interview audio to Research Assistant. Confirm that your study permissions and participant consent cover this use. The transcript will be a draft for you to check against the recording.',
         ),
         actions: [
           TextButton(
@@ -241,7 +712,7 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
       notice(
         e.details is Map
             ? e.details['error']?.toString() ?? 'Transcription failed.'
-            : 'Deploy transcribe-interview and add the Gemini server secret.',
+            : 'Research Assistant transcription is unavailable. Deploy transcribe-interview and configure its server secret.',
       );
     } catch (e) {
       notice(e.toString());
@@ -439,11 +910,11 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 130),
           children: [
             const Text(
-              'Qualitative interviews',
+              'Data Capture',
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
             const Text(
-              'Record an interview, keep it with the participant, and read it later on any signed-in device.',
+              'Keep interviews, images, 7-second videos and documents safely with the research project they belong to.',
             ),
             if (message != null)
               Card(
@@ -461,7 +932,9 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: projectId,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Project'),
+                      decoration: const InputDecoration(
+                        labelText: 'Project for captured data',
+                      ),
                       items: projects
                           .map(
                             (p) => DropdownMenuItem(
@@ -569,6 +1042,12 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            _buildAssetCaptureCard(),
+            if (projectId != null) ...[
+              const SizedBox(height: 20),
+              _buildAssetLibrary(),
+            ],
             StreamBuilder<List<InterviewDraft>>(
               stream: (db.select(
                 db.interviewDrafts,

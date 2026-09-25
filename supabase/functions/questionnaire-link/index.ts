@@ -22,12 +22,20 @@ Deno.serve(async (req: Request) => {
       const auth = await fetch(`${base}/auth/v1/user`,{headers:{apikey:Deno.env.get('SUPABASE_ANON_KEY')!,Authorization:req.headers.get('Authorization') ?? ''}});
       if (!auth.ok) return json({error:'Sign in to manage questionnaire links'},401);
       const user = await auth.json();
+      let entitlements = await db(`user_entitlements?user_id=eq.${encodeURIComponent(user.id)}&select=tier,valid_until,free_publish_used_at`);
+      const entitlement = entitlements[0];
+      const paidActive = entitlement?.valid_until && Date.parse(entitlement.valid_until) > Date.now();
+      const tier = paidActive && ['plus','pro'].includes(entitlement?.tier) ? entitlement.tier : 'free';
       const qs = await db(`questionnaires?id=eq.${encodeURIComponent(body.questionnaireId ?? '')}&select=id,project_id`);
       if (!qs.length) return json({error:'Questionnaire unavailable. Sync first.'},404);
       const projects = await db(`projects?id=eq.${encodeURIComponent(qs[0].project_id)}&owner_id=eq.${encodeURIComponent(user.id)}&select=id`);
       if (!projects.length) return json({error:'Only the project owner can manage this link'},403);
       let links = await db(`questionnaire_links?questionnaire_id=eq.${encodeURIComponent(qs[0].id)}`);
       if (body.action === 'publish') {
+        if (tier === 'free' && entitlement?.free_publish_used_at) {
+          const nextAt = Date.parse(entitlement.free_publish_used_at) + 7*24*60*60*1000;
+          if (nextAt > Date.now()) return json({error:`Free accounts can publish again on ${new Date(nextAt).toISOString()}. Upgrade for unlimited publishing.`},403);
+        }
         const questions = await db(`questions?questionnaire_id=eq.${encodeURIComponent(qs[0].id)}&order=order_index,id&limit=501`);
         if (!questions.length || questions.length>500) return json({error:'Publish between 1 and 500 questions'},400);
         if (questions.some((q: any) => q.skip_logic_json?.questionId && !questions.slice(0,questions.indexOf(q)).some((p:any)=>p.id===q.skip_logic_json.questionId))) return json({error:'Skip rules must refer to earlier questions. Update the questionnaire first.'},400);
@@ -39,16 +47,21 @@ Deno.serve(async (req: Request) => {
         if (used.length && used[0].questionnaire_id !== qs[0].id) return json({error:'This link name is already in use. Choose another.'},409);
         if (!consent || consent.length>5000) return json({error:'Add study information and consent text (up to 5,000 characters)'},400);
         const days = Number(body.days ?? 30);
-        if (!Number.isInteger(days) || days < 1 || days > 365) return json({error:'Choose 1–365 days'},400);
-        const data = {slug,active:true,collect_name:body.collectName === true,collect_contact:body.collectContact === true,consent_text:consent,expires_at:new Date(Date.now()+days*86400000).toISOString()};
+        if (tier !== 'free' && (!Number.isInteger(days) || days < 1 || days > 365)) return json({error:'Choose 1–365 days'},400);
+        const expiresAt = tier === 'free' ? new Date(Date.now()+5*60*1000) : new Date(Date.now()+days*86400000);
+        const data = {slug,active:true,collect_name:body.collectName === true,collect_contact:body.collectContact === true,consent_text:consent,expires_at:expiresAt.toISOString()};
         links = links.length ? await db(`questionnaire_links?id=eq.${links[0].id}`,'PATCH',data)
           : await db('questionnaire_links','POST',{...data,questionnaire_id:qs[0].id});
+        if (tier === 'free') {
+          const usage = {free_publish_used_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+          entitlements = entitlements.length
+            ? await db(`user_entitlements?user_id=eq.${encodeURIComponent(user.id)}`,'PATCH',usage)
+            : await db('user_entitlements','POST',{user_id:user.id,tier:'free',...usage});
+        }
       }
       if (body.action === 'close' && links.length) links = await db(`questionnaire_links?id=eq.${links[0].id}`,'PATCH',{active:false});
-      return json({link:links[0] ?? null});
+      return json({link:links[0] ?? null,tier});
     }
-    // Published link names permit reading only this instrument and submitting.
-    // They never permit reading participants, responses, or account information.
     if (!/^[a-z0-9][a-z0-9-]{5,59}$/.test(body.slug ?? '')) return json({error:'Invalid questionnaire link'},404);
     const links = await db(`questionnaire_links?slug=eq.${body.slug}&select=*`);
     const link = links[0];

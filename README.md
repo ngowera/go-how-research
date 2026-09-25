@@ -1,11 +1,11 @@
-# GoHow Research — All-in-One University Research Software
+# Go-How RS — All-in-One University Research Software
 
 > **Smarter Research. Better Evidence.**  
-> Designed according to the *GoHow Research-Sync* business and engineering specifications.
+> Designed according to the *Go-How RS-Sync* business and engineering specifications.
 
 ---
 
-## 🚀 Key Features Built into GoHow Research
+## 🚀 Key Features Built into Go-How RS
 
 ### 1. 📋 Research Project Lifecycle Management
 - Manage full research proposals, abstracts, and methodologies (Quantitative, Qualitative, Mixed-Methods).
@@ -145,7 +145,7 @@ To run it:
 
 ## 🌐 Running in the Web Browser (Chrome)
 
-You can also run GoHow Research in your browser without any native desktop compilation:
+You can also run Go-How RS in your browser without any native desktop compilation:
 ```bash
 flutter run -d chrome
 ```

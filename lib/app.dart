@@ -14,7 +14,7 @@ class GoHowResearchApp extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider);
 
     return MaterialApp.router(
-      title: 'GoHow Research',
+      title: 'Go-How RS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme.copyWith(
         colorScheme:
@@ -23,8 +23,56 @@ class GoHowResearchApp extends ConsumerWidget {
             ? VisualDensity.compact
             : VisualDensity.standard,
       ),
-      builder: (context, child) => child!,
+      builder: (context, child) => _StartupBranding(child: child!),
       routerConfig: router,
     );
   }
+}
+
+class _StartupBranding extends StatefulWidget {
+  final Widget child;
+  const _StartupBranding({required this.child});
+
+  @override
+  State<_StartupBranding> createState() => _StartupBrandingState();
+}
+
+class _StartupBrandingState extends State<_StartupBranding> {
+  bool _showBranding = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _showBranding = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+        children: [
+          widget.child,
+          if (_showBranding)
+            ColoredBox(
+              color: Colors.white,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipOval(
+                      child: Image.asset('app_logo.png',
+                          width: 146, height: 146, fit: BoxFit.cover),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text('Go-How RS',
+                        style: TextStyle(
+                            color: Color(0xFF1E293B),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
 }

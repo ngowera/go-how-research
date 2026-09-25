@@ -1,10 +1,10 @@
 @echo off
 REM =========================================================================
-REM GoHow Research - Windows Automated Build Script
+REM Go-How RS - Windows Automated Build Script
 REM =========================================================================
 echo.
 echo =========================================================================
-echo    GoHow Research - All-in-One University Research Software
+echo    Go-How RS - All-in-One University Research Software
 echo =========================================================================
 echo.
 

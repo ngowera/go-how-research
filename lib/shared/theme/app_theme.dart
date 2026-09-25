@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Static color constants used across the GoHow Research app.
+/// Static color constants used across the Go-How RS app.
 class AppColors {
   AppColors._();
 

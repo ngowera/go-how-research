@@ -9,6 +9,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/app_settings_provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/billing_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
 import '../../../core/providers/sync_provider.dart';
@@ -49,7 +50,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     final user = ref.read(currentUserProvider);
     final settings = ref.read(appSettingsProvider);
 
@@ -170,7 +171,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         filename,
         utf8.encode(jsonStr),
         mimeType: 'application/json',
-        subject: 'GoHow Research Database Backup JSON',
+        subject: 'Go-How RS Database Backup JSON',
       );
 
       if (mounted) {
@@ -385,6 +386,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   Tab(
                       icon: Icon(Icons.storage_rounded, size: 18),
                       text: 'Database & Storage Health'),
+                  Tab(
+                      icon: Icon(Icons.workspace_premium_outlined, size: 18),
+                      text: 'Plans & Payments'),
                 ],
               ),
             ),
@@ -400,6 +404,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   _buildStatisticalEngineTab(settings),
                   _buildCloudSyncTab(syncState, settings),
                   _buildDatabaseStorageTab(syncState),
+                  _buildPaymentsTab(),
                 ],
               ),
             ),
@@ -411,6 +416,175 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   // ===========================================================================
   // TAB 1: Academic Profile & Identity
+  Widget _buildPaymentsTab() {
+    final billing = ref.watch(billingProvider);
+    return RefreshIndicator(
+      onRefresh: () => ref.read(billingProvider.notifier).refresh(),
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Plans & Payments',
+                      style: GoogleFonts.poppins(
+                          fontSize: 24, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text(
+                      'Your current plan is ${billing.planName}. Paid passes last 30 days and are processed securely by PayChangu.',
+                      style: TextStyle(color: Colors.grey.shade600)),
+                  if (billing.validUntil != null)
+                    Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('Access valid until ${billing.validUntil}',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600))),
+                  if (billing.error != null)
+                    Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(billing.error!,
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.error))),
+                  const SizedBox(height: 20),
+                  LayoutBuilder(builder: (context, constraints) {
+                    final width = constraints.maxWidth >= 800
+                        ? (constraints.maxWidth - 32) / 3
+                        : constraints.maxWidth;
+                    return Wrap(spacing: 16, runSpacing: 16, children: [
+                      _planCard(
+                          width: width,
+                          title: 'Free',
+                          price: 'MWK 0',
+                          selected: billing.tier == SubscriptionTier.free,
+                          features: const [
+                            'Up to 2 projects',
+                            'Online questionnaire for 5 minutes',
+                            'One online publishing window every 7 days',
+                            'Offline data collection'
+                          ]),
+                      _planCard(
+                          width: width,
+                          title: 'Plus',
+                          price: 'MWK 10,000 / 30 days',
+                          selected: billing.tier == SubscriptionTier.plus,
+                          features: const [
+                            'Unlimited projects',
+                            'Unlimited online questionnaires',
+                            'Full analytics',
+                            'No Excel or SPSS export'
+                          ],
+                          onChoose: billing.isLoading
+                              ? null
+                              : () => _buyPlan(SubscriptionTier.plus)),
+                      _planCard(
+                          width: width,
+                          title: 'Pro',
+                          price: 'MWK 20,000 / 30 days',
+                          selected: billing.tier == SubscriptionTier.pro,
+                          highlighted: true,
+                          features: const [
+                            'Everything in Plus',
+                            'Excel and SPSS exports',
+                            'All premium features unlocked'
+                          ],
+                          onChoose: billing.isLoading
+                              ? null
+                              : () => _buyPlan(SubscriptionTier.pro)),
+                    ]);
+                  }),
+                  const SizedBox(height: 16),
+                  const Text(
+                      'Payments open in PayChangu. Access is activated only after PayChangu verifies the transaction. Pull down or tap Refresh after returning.'),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                      onPressed: billing.isLoading
+                          ? null
+                          : () => ref.read(billingProvider.notifier).refresh(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Refresh subscription')),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _planCard(
+          {required double width,
+          required String title,
+          required String price,
+          required bool selected,
+          required List<String> features,
+          bool highlighted = false,
+          VoidCallback? onChoose}) =>
+      SizedBox(
+        width: width,
+        child: Card(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                  color: highlighted ? AppTheme.kPrimary : Colors.grey.shade200,
+                  width: highlighted ? 2 : 1)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text(title,
+                        style: GoogleFonts.poppins(
+                            fontSize: 20, fontWeight: FontWeight.w700))),
+                if (selected) const Chip(label: Text('Current'))
+              ]),
+              const SizedBox(height: 8),
+              Text(price,
+                  style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.kPrimary)),
+              const SizedBox(height: 16),
+              ...features.map((feature) => Padding(
+                  padding: const EdgeInsets.only(bottom: 9),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            size: 18, color: AppTheme.kSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(feature))
+                      ]))),
+              if (!selected && onChoose != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                        onPressed: onChoose, child: Text('Choose $title')))
+              ],
+            ]),
+          ),
+        ),
+      );
+
+  Future<void> _buyPlan(SubscriptionTier tier) async {
+    try {
+      await ref.read(billingProvider.notifier).purchase(tier);
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Complete payment in PayChangu, then return and refresh your subscription.')));
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(ref.read(billingProvider).error ??
+                'Could not open checkout.')));
+    }
+  }
+
   // ===========================================================================
   Widget _buildAcademicProfileTab(AppUser? user) {
     return SingleChildScrollView(

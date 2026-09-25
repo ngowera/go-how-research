@@ -83,7 +83,7 @@ const List<_NavItem> _navItems = [
     route: '/participants',
   ),
   _NavItem(
-    label: 'Interviews',
+    label: 'Data Capture',
     icon: Icons.mic_none,
     activeIcon: Icons.mic,
     route: '/interviews',
@@ -319,35 +319,51 @@ class _CollaborationNotificationBellState
         .toList(growable: false);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFFFFF8F2),
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF321C15),
       barrierColor: const Color(0xFF2A160F).withValues(alpha: 0.30),
       showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 620),
+      builder: (context) => FractionallySizedBox(
+        heightFactor: .82,
+        widthFactor: MediaQuery.sizeOf(context).width < 700 ? 1 : .62,
+        child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    CircleAvatar(
-                      backgroundColor: Color(0xFF4B2A1D),
+                    const CircleAvatar(
+                      backgroundColor: Color(0xFF5B382C),
                       foregroundColor: Color(0xFFFFF4EA),
                       child: Icon(Icons.notifications_active_outlined),
                     ),
-                    SizedBox(width: 12),
-                    Text(
+                    const SizedBox(width: 12),
+                    const Expanded(
+                        child: Text(
                       'Research activity',
                       style: TextStyle(
-                        color: Color(0xFF3B2118),
-                        fontSize: 20,
+                        color: Color(0xFFFFF4EA),
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                       ),
-                    ),
+                    )),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      color: const Color(0xFFFFF4EA),
+                      icon: const Icon(Icons.close),
+                    )
                   ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 52),
+                  child: Text(
+                    'Submissions, collaboration and project updates',
+                    style: TextStyle(color: Color(0xFFE7CFC0), fontSize: 12),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 if (_notifications.isEmpty && _requests.isEmpty)
@@ -356,7 +372,7 @@ class _CollaborationNotificationBellState
                     child: Center(
                       child: Text(
                         'No new research activity yet.',
-                        style: TextStyle(color: Color(0xFF795548)),
+                        style: TextStyle(color: Color(0xFFE7CFC0)),
                       ),
                     ),
                   )
@@ -370,12 +386,12 @@ class _CollaborationNotificationBellState
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
                               color: notice.isUnread
-                                  ? const Color(0xFFFFE8D5)
-                                  : Colors.white.withValues(alpha: 0.72),
+                                  ? const Color(0xFF5B382C)
+                                  : const Color(0xFF43271E),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: const Color(0xFFB9896F)
-                                    .withValues(alpha: 0.35),
+                                color: const Color(0xFFE7CFC0)
+                                    .withValues(alpha: 0.20),
                               ),
                             ),
                             child: ListTile(
@@ -383,17 +399,20 @@ class _CollaborationNotificationBellState
                                 notice.kind == 'questionnaire_submission'
                                     ? Icons.assignment_turned_in_outlined
                                     : Icons.notifications_none_rounded,
-                                color: const Color(0xFF6D3D2A),
+                                color: const Color(0xFFFFD7BE),
                               ),
                               title: Text(
                                 notice.title,
                                 style: const TextStyle(
-                                  color: Color(0xFF3B2118),
+                                  color: Color(0xFFFFF4EA),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                               subtitle: Text(
                                 '${notice.body}\n${_relativeTime(notice.createdAt)}',
+                                style: const TextStyle(
+                                  color: Color(0xFFE7CFC0),
+                                ),
                               ),
                               isThreeLine: true,
                             ),
@@ -403,11 +422,14 @@ class _CollaborationNotificationBellState
                           (request) => ListTile(
                             leading: const Icon(
                               Icons.person_add_alt_1_outlined,
-                              color: Color(0xFF6D3D2A),
+                              color: Color(0xFFFFD7BE),
                             ),
-                            title: Text(request.requesterName),
+                            title: Text(request.requesterName,
+                                style:
+                                    const TextStyle(color: Color(0xFFFFF4EA))),
                             subtitle: Text(
                               '${request.projectTitle} • ${request.requestedRole}',
+                              style: const TextStyle(color: Color(0xFFE7CFC0)),
                             ),
                           ),
                         ),
@@ -423,6 +445,9 @@ class _CollaborationNotificationBellState
                         GoRouter.of(context).go('/settings');
                       },
                       child: const Text('Manage collaboration'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFD7BE),
+                      ),
                     ),
                   ),
               ],
@@ -643,17 +668,14 @@ class _AppLogo extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: compact ? 30 : 36,
-          height: compact ? 30 : 36,
-          decoration: BoxDecoration(
-            color: AppColors.kPrimary,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.biotech_rounded,
-            color: Colors.white,
-            size: compact ? 18 : 22,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.asset(
+            'app_logo.png',
+            width: compact ? 30 : 36,
+            height: compact ? 30 : 36,
+            fit: BoxFit.cover,
+            semanticLabel: 'Go-How RS',
           ),
         ),
         const SizedBox(width: 10),
@@ -672,7 +694,7 @@ class _AppLogo extends StatelessWidget {
           )
         else
           Text(
-            'GoHow Research',
+            'Go-How RS',
             style: GoogleFonts.poppins(
               fontSize: 15,
               fontWeight: FontWeight.w700,

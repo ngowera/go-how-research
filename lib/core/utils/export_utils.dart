@@ -17,7 +17,7 @@ class ExportUtils {
   }) async {
     final document = pw.Document(
       title: '${project.title} — Research Report',
-      author: 'GoHow Research',
+      author: 'Go-How RS',
     );
     document.addPage(
       pw.MultiPage(
@@ -26,7 +26,7 @@ class ExportUtils {
         header: (_) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('GOHOW RESEARCH REPORT',
+            pw.Text('GO-HOW RS REPORT',
                 style: pw.TextStyle(
                     color: PdfColors.teal700, fontWeight: pw.FontWeight.bold)),
             pw.Text(DateTime.now().toIso8601String().split('T').first),

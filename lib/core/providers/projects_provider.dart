@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../database/app_database.dart' show AppDatabase, databaseProvider;
 import '../models/app_models.dart';
 import 'auth_provider.dart';
+import 'billing_provider.dart';
 import 'sync_provider.dart';
 
 class ProjectsState {
@@ -71,6 +72,11 @@ class ProjectsNotifier extends StateNotifier<ProjectsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final currentUser = _ref.read(currentUserProvider);
+      final billing = _ref.read(billingProvider);
+      if (!billing.hasUnlimitedProjects && state.projects.length >= 2) {
+        throw StateError(
+            'The Free plan supports up to 2 projects. Upgrade in Settings to create more.');
+      }
       final now = DateTime.now();
       final project = ResearchProject(
         id: _uuid.v4(),
@@ -134,6 +140,13 @@ class ProjectsNotifier extends StateNotifier<ProjectsState> {
   }
 
   Future<void> duplicateProject(String id) async {
+    final billing = _ref.read(billingProvider);
+    if (!billing.hasUnlimitedProjects && state.projects.length >= 2) {
+      state = state.copyWith(
+          error:
+              'The Free plan supports up to 2 projects. Upgrade in Settings to duplicate more.');
+      return;
+    }
     final proj = await _db.getProjectById(id);
     if (proj != null) {
       final now = DateTime.now();
