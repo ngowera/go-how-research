@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,9 +8,10 @@ import '../../../core/database/app_database.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/app_settings_provider.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/billing_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
+import '../../../core/providers/responses_provider.dart';
+import '../../../core/providers/participants_provider.dart';
 import '../../../core/providers/sync_provider.dart';
 import '../../../core/utils/export_utils.dart';
 import '../../../core/utils/sample_data_seeder.dart';
@@ -42,6 +42,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     'questions': 0,
     'responses': 0,
     'participants': 0,
+    'mockProjects': 0,
   };
   bool _isLoadingStats = true;
   bool _isSeeding = false;
@@ -50,7 +51,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     final user = ref.read(currentUserProvider);
     final settings = ref.read(appSettingsProvider);
 
@@ -80,6 +81,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     try {
       final db = ref.read(databaseProvider);
       final stats = await db.getDatabaseStats();
+      final projects = await db.getProjects();
+      stats['mockProjects'] =
+          projects.where(SampleDataSeeder.isSampleProject).length;
       if (mounted) {
         setState(() {
           _dbStats = stats;
@@ -243,6 +247,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     }
   }
 
+  Future<void> _confirmClearMockData() async {
+    final db = ref.read(databaseProvider);
+    final sampleProjects = (await db.getProjects())
+        .where(SampleDataSeeder.isSampleProject)
+        .toList();
+    if (sampleProjects.isEmpty) {
+      await _refreshDbStats();
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Clear Sample Data?',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        content: Text(
+          'This removes ${sampleProjects.length} generated sample ${sampleProjects.length == 1 ? 'project' : 'projects'} and their related study data. Your other research projects will remain.',
+          style: GoogleFonts.poppins(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Clear Sample Data',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    for (final project in sampleProjects) {
+      final questionnaires = await db.getQuestionnaires(projectId: project.id);
+      for (final questionnaire in questionnaires) {
+        ref.invalidate(responsesProvider(questionnaire.id));
+        ref.invalidate(questionsByQuestionnaireProvider(questionnaire.id));
+      }
+      await db.deleteProject(project.id);
+    }
+    ref.invalidate(participantsProvider);
+    await ref.read(projectsProvider.notifier).loadProjects();
+    await ref.read(questionnairesProvider.notifier).loadQuestionnaires();
+    await _refreshDbStats();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Generated sample data removed.'),
+          backgroundColor: AppTheme.kPrimary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -252,102 +315,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding:
+            EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Top Header Bar ───────────────────────────────────────────────
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final narrow = constraints.maxWidth < 700;
-                final heading = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 6,
-                      children: [
-                        Text(
-                          'Settings & System Hub',
-                          style: GoogleFonts.poppins(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.kPrimary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: AppTheme.kPrimary.withOpacity(0.3)),
-                          ),
-                          child: Text(
-                            'v1.0.0 Release',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.kPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Manage researcher identity, survey defaults, SQLite offline storage, and cloud sync',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                );
-                final actions = Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _refreshDbStats,
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('Refresh'),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        await ref.read(authStateProvider.notifier).logout();
-                        if (mounted) context.go('/login');
-                      },
-                      icon: const Icon(Icons.logout_rounded, size: 16),
-                      label: const Text('Sign Out'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                );
-                if (narrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      heading,
-                      const SizedBox(height: 12),
-                      actions,
-                    ],
-                  );
-                }
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: heading),
-                    const SizedBox(width: 20),
-                    actions,
-                  ],
-                );
-              },
+            Text(
+              'Settings',
+              style: GoogleFonts.poppins(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1E293B),
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -373,7 +352,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 tabs: const [
                   Tab(
                       icon: Icon(Icons.badge_outlined, size: 18),
-                      text: 'Academic Profile'),
+                      text: 'User Profile'),
                   Tab(
                       icon: Icon(Icons.tune_rounded, size: 18),
                       text: 'Field & Survey Defaults'),
@@ -386,9 +365,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   Tab(
                       icon: Icon(Icons.storage_rounded, size: 18),
                       text: 'Database & Storage Health'),
-                  Tab(
-                      icon: Icon(Icons.workspace_premium_outlined, size: 18),
-                      text: 'Plans & Payments'),
                 ],
               ),
             ),
@@ -404,7 +380,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   _buildStatisticalEngineTab(settings),
                   _buildCloudSyncTab(syncState, settings),
                   _buildDatabaseStorageTab(syncState),
-                  _buildPaymentsTab(),
                 ],
               ),
             ),
@@ -416,175 +391,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   // ===========================================================================
   // TAB 1: Academic Profile & Identity
-  Widget _buildPaymentsTab() {
-    final billing = ref.watch(billingProvider);
-    return RefreshIndicator(
-      onRefresh: () => ref.read(billingProvider.notifier).refresh(),
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Plans & Payments',
-                      style: GoogleFonts.poppins(
-                          fontSize: 24, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Text(
-                      'Your current plan is ${billing.planName}. Paid passes last 30 days and are processed securely by PayChangu.',
-                      style: TextStyle(color: Colors.grey.shade600)),
-                  if (billing.validUntil != null)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text('Access valid until ${billing.validUntil}',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600))),
-                  if (billing.error != null)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Text(billing.error!,
-                            style: TextStyle(
-                                color: Theme.of(context).colorScheme.error))),
-                  const SizedBox(height: 20),
-                  LayoutBuilder(builder: (context, constraints) {
-                    final width = constraints.maxWidth >= 800
-                        ? (constraints.maxWidth - 32) / 3
-                        : constraints.maxWidth;
-                    return Wrap(spacing: 16, runSpacing: 16, children: [
-                      _planCard(
-                          width: width,
-                          title: 'Free',
-                          price: 'MWK 0',
-                          selected: billing.tier == SubscriptionTier.free,
-                          features: const [
-                            'Up to 2 projects',
-                            'Online questionnaire for 5 minutes',
-                            'One online publishing window every 7 days',
-                            'Offline data collection'
-                          ]),
-                      _planCard(
-                          width: width,
-                          title: 'Plus',
-                          price: 'MWK 10,000 / 30 days',
-                          selected: billing.tier == SubscriptionTier.plus,
-                          features: const [
-                            'Unlimited projects',
-                            'Unlimited online questionnaires',
-                            'Full analytics',
-                            'No Excel or SPSS export'
-                          ],
-                          onChoose: billing.isLoading
-                              ? null
-                              : () => _buyPlan(SubscriptionTier.plus)),
-                      _planCard(
-                          width: width,
-                          title: 'Pro',
-                          price: 'MWK 20,000 / 30 days',
-                          selected: billing.tier == SubscriptionTier.pro,
-                          highlighted: true,
-                          features: const [
-                            'Everything in Plus',
-                            'Excel and SPSS exports',
-                            'All premium features unlocked'
-                          ],
-                          onChoose: billing.isLoading
-                              ? null
-                              : () => _buyPlan(SubscriptionTier.pro)),
-                    ]);
-                  }),
-                  const SizedBox(height: 16),
-                  const Text(
-                      'Payments open in PayChangu. Access is activated only after PayChangu verifies the transaction. Pull down or tap Refresh after returning.'),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                      onPressed: billing.isLoading
-                          ? null
-                          : () => ref.read(billingProvider.notifier).refresh(),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Refresh subscription')),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _planCard(
-          {required double width,
-          required String title,
-          required String price,
-          required bool selected,
-          required List<String> features,
-          bool highlighted = false,
-          VoidCallback? onChoose}) =>
-      SizedBox(
-        width: width,
-        child: Card(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                  color: highlighted ? AppTheme.kPrimary : Colors.grey.shade200,
-                  width: highlighted ? 2 : 1)),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                    child: Text(title,
-                        style: GoogleFonts.poppins(
-                            fontSize: 20, fontWeight: FontWeight.w700))),
-                if (selected) const Chip(label: Text('Current'))
-              ]),
-              const SizedBox(height: 8),
-              Text(price,
-                  style: GoogleFonts.poppins(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.kPrimary)),
-              const SizedBox(height: 16),
-              ...features.map((feature) => Padding(
-                  padding: const EdgeInsets.only(bottom: 9),
-                  child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.check_circle,
-                            size: 18, color: AppTheme.kSecondary),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(feature))
-                      ]))),
-              if (!selected && onChoose != null) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                        onPressed: onChoose, child: Text('Choose $title')))
-              ],
-            ]),
-          ),
-        ),
-      );
-
-  Future<void> _buyPlan(SubscriptionTier tier) async {
-    try {
-      await ref.read(billingProvider.notifier).purchase(tier);
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'Complete payment in PayChangu, then return and refresh your subscription.')));
-    } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(ref.read(billingProvider).error ??
-                'Could not open checkout.')));
-    }
-  }
-
   // ===========================================================================
   Widget _buildAcademicProfileTab(AppUser? user) {
     return SingleChildScrollView(
@@ -760,8 +566,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                    'Academic Profile updated successfully!'),
+                                content:
+                                    Text('User Profile updated successfully!'),
                                 backgroundColor: AppTheme.kSuccess,
                               ),
                             );
@@ -1098,6 +904,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 ),
                 const Divider(height: 28),
 
+                _buildSettingTile(
+                  title: 'Descriptive Statistics Completeness',
+                  subtitle:
+                      'Show answered, missing, and response-rate summaries on each descriptive statistics question.',
+                  child: Switch.adaptive(
+                    value: settings.showDescriptiveCompleteness,
+                    onChanged: ref
+                        .read(appSettingsProvider.notifier)
+                        .updateShowDescriptiveCompleteness,
+                  ),
+                ),
+                const Divider(height: 28),
+
+                _buildSettingTile(
+                  title: 'Analytics Insights',
+                  subtitle:
+                      'Show plain-language summaries and interpretations alongside statistical results in Analytics.',
+                  child: Switch.adaptive(
+                    value: settings.showAnalyticsInsights,
+                    onChanged: ref
+                        .read(appSettingsProvider.notifier)
+                        .updateShowAnalyticsInsights,
+                  ),
+                ),
+                const Divider(height: 28),
+
                 // Academic Citation Format
                 _buildSettingTile(
                   title: 'Citation Style for Generated Reports',
@@ -1213,7 +1045,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Supabase Cloud Sync Engine',
+                                  'Cloud Sync Engine',
                                   style: GoogleFonts.poppins(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -1221,7 +1053,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                                   ),
                                 ),
                                 Text(
-                                  'Offline SQLite ↔ Supabase PostgreSQL',
+                                  'Offline SQLite ↔ Cloud Database',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,
@@ -1323,45 +1155,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             .updateAutoSync(v);
                       },
                     ),
-                    const SizedBox(height: 14),
-
-                    // Security card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.shield_outlined,
-                              size: 22, color: Color(0xFF00897B)),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Protected Credentials (.env)',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1E293B),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Your Supabase Project URL and Anon Key are securely loaded from the project root .env file and never exposed in the UI.',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton.icon(
+                        onPressed: _refreshDbStats,
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Refresh status'),
                       ),
                     ),
                   ],
@@ -1391,7 +1190,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   final isPhone = constraints.maxWidth < 560;
                   final cardWidth = isPhone
                       ? (constraints.maxWidth - 12) / 2
-                      : (constraints.maxWidth - 48) / 5;
+                      : (constraints.maxWidth - 60) / 6;
                   return Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -1451,6 +1250,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           color: const Color(0xFF2E7D32),
                         ),
                       ),
+                      SizedBox(
+                        width: cardWidth,
+                        child: _statBox(
+                          title: 'Sample Projects',
+                          count: _isLoadingStats
+                              ? '...'
+                              : '${_dbStats['mockProjects'] ?? 0}',
+                          icon: Icons.science_outlined,
+                          color: const Color(0xFF7B1FA2),
+                        ),
+                      ),
                     ],
                   );
                 },
@@ -1472,7 +1282,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Database Tools & Mock Data Generator',
+                      'Database Tools & Mock Data',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -1481,7 +1291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Utilities to seed realistic academic datasets, backup your research SQLite store, or reset local caches.',
+                      'Load a sample study for Projects, Data and Analytics, export a backup, or remove generated sample data when finished.',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -1497,7 +1307,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       title:
                           'Load Sample Research Study (Instant Test Dataset)',
                       description:
-                          'Seeds a complete study with 1 questionnaire, 7 questions, and 15 completed responses to test charts, cross-tabs, and reports.',
+                          'Adds a clearly marked sample project with questionnaire data and responses for exploring Projects, Data, Analytics, charts and reports.',
                       action: ElevatedButton.icon(
                         onPressed: _isSeeding ? null : _seedData,
                         icon: _isSeeding
@@ -1514,6 +1324,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           backgroundColor: AppTheme.kPrimary,
                           foregroundColor: Colors.white,
                         ),
+                      ),
+                    ),
+                    const Divider(height: 28),
+
+                    _buildDatabaseAction(
+                      icon: Icons.cleaning_services_outlined,
+                      iconColor: const Color(0xFF546E7A),
+                      iconBackground: const Color(0xFF546E7A).withOpacity(0.1),
+                      title: 'Remove Generated Sample Projects',
+                      description:
+                          'Clears generated sample projects and their related responses while keeping your own research data.',
+                      action: OutlinedButton.icon(
+                        onPressed: (_dbStats['mockProjects'] ?? 0) == 0
+                            ? null
+                            : _confirmClearMockData,
+                        icon:
+                            const Icon(Icons.delete_outline_rounded, size: 16),
+                        label: const Text('Clear Sample Data'),
                       ),
                     ),
                     const Divider(height: 28),
@@ -1569,15 +1397,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   Widget _buildCloudHealthCard(SyncState syncState) {
     final user = ref.watch(currentUserProvider);
     bool cloudConfigured = false;
-    String cloudUser = 'Not signed in to Supabase';
+    String cloudUser = 'Not signed in to cloud services';
     try {
       final session = Supabase.instance.client.auth.currentSession;
       cloudConfigured = session != null;
       cloudUser = session?.user.email ?? cloudUser;
     } catch (_) {}
 
-    final totalRecords =
-        _dbStats.values.fold<int>(0, (sum, value) => sum + value);
+    final totalRecords = [
+      'projects',
+      'questionnaires',
+      'questions',
+      'responses',
+      'participants'
+    ]
+        .map((key) => _dbStats[key] ?? 0)
+        .fold<int>(0, (sum, value) => sum + value);
     final syncedRecords =
         (totalRecords - syncState.pendingCount).clamp(0, totalRecords);
     final syncProgress = totalRecords == 0 ? 0.0 : syncedRecords / totalRecords;
@@ -1599,7 +1434,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       cloudConfigured ? const Color(0xFF00897B) : Colors.grey),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Supabase Server Health',
+                child: Text('Server Health',
                     style: GoogleFonts.poppins(
                         fontSize: 16, fontWeight: FontWeight.w700)),
               ),
@@ -1650,7 +1485,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Exact usage is read through a protected server function; the service-role key never enters the app.',
+            'Media totals below are for files stored by this signed-in account.',
             style:
                 GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
           ),
@@ -1661,7 +1496,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               final usage = snapshot.data;
               if (usage == null) {
                 return Text(
-                  'Server usage is unavailable until the storage-usage function is deployed.',
+                  'Account storage details are unavailable right now.',
                   style: GoogleFonts.poppins(
                       fontSize: 11, color: Colors.grey.shade600),
                 );
@@ -1673,7 +1508,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 runSpacing: 10,
                 children: [
                   _usageMetric('Database', _formatBytes(databaseBytes)),
-                  _usageMetric('File storage', _formatBytes(storageBytes)),
+                  _usageMetric('Your files', _formatBytes(storageBytes)),
+                  _usageMetric(
+                      'Images', _formatBytes(usage['imageBytes'] as num? ?? 0)),
+                  _usageMetric('Recordings',
+                      _formatBytes(usage['recordingBytes'] as num? ?? 0)),
+                  _usageMetric(
+                      'Videos', _formatBytes(usage['videoBytes'] as num? ?? 0)),
+                  _usageMetric('Other files',
+                      _formatBytes(usage['otherFileBytes'] as num? ?? 0)),
                 ],
               );
             },

@@ -18,7 +18,6 @@ class _ProjectCollaborationCardState
   final service = ProjectCollaborationService();
   String requestedRole = 'studentCollaborator';
   List<ProjectAccessRequest> requests = const [];
-  List<ProjectNotification> notifications = const [];
   bool busy = false;
   String? message;
 
@@ -37,11 +36,9 @@ class _ProjectCollaborationCardState
   Future<void> _loadRequests() async {
     try {
       final result = await service.incomingRequests();
-      final notices = await service.notifications();
       if (mounted) {
         setState(() {
           requests = result;
-          notifications = notices;
         });
       }
     } catch (_) {
@@ -102,7 +99,7 @@ class _ProjectCollaborationCardState
                   )),
           const SizedBox(height: 4),
           Text(
-            'Join a research project by ID or review requests from researchers who want to work with you.',
+            'Request a role on another researcher’s project by ID. The owner must approve your request before the project appears in your workspace.',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
           const SizedBox(height: 16),
@@ -200,20 +197,6 @@ class _ProjectCollaborationCardState
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-          if (notifications.isNotEmpty) ...[
-            const Divider(height: 28),
-            const Text('Notifications',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ...notifications.map(
-              (notification) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.notifications_none_rounded),
-                title: Text(notification.title),
-                subtitle: Text(notification.body),
               ),
             ),
           ],

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/sync_provider.dart';
-import '../../../core/providers/billing_provider.dart';
 import 'public_questionnaire_screen.dart';
 
 class QuestionnaireShareDialog extends ConsumerStatefulWidget {
@@ -45,11 +44,13 @@ class _QuestionnaireShareDialogState
     });
     try {
       if (action == 'publish') {
-        await ref.read(syncProvider.notifier).syncAll();
+        final ready = await ref
+            .read(syncProvider.notifier)
+            .syncQuestionnaireForPublishing(widget.questionnaire.id);
         final sync = ref.read(syncProvider);
-        if (sync.status != SyncStateStatus.success)
+        if (!ready || sync.status != SyncStateStatus.success)
           throw Exception(
-              'Sync the questionnaire successfully before publishing. ${sync.message ?? ''}');
+              'Could not prepare this questionnaire for publishing. ${sync.message ?? ''}');
       }
       final result = await questionnaireLinkRequest({
         'action': action,
@@ -82,15 +83,22 @@ class _QuestionnaireShareDialogState
 
   @override
   Widget build(BuildContext context) {
-    final billing = ref.watch(billingProvider);
+    final screenSize = MediaQuery.sizeOf(context);
+    final isPhone = screenSize.width < 600;
     final active = _link?['active'] == true &&
         DateTime.parse(_link!['expires_at']).isAfter(DateTime.now());
     final url =
         _link == null ? null : 'https://www.afrisoft.space/${_link!['slug']}';
     return AlertDialog(
+        insetPadding: EdgeInsets.symmetric(
+            horizontal: isPhone ? 12 : 40, vertical: isPhone ? 18 : 24),
+        actionsOverflowDirection: VerticalDirection.down,
+        actionsOverflowButtonSpacing: 8,
+        actionsAlignment: MainAxisAlignment.end,
         title: const Text('Collect & share questionnaire'),
         content: SizedBox(
-            width: 520,
+            width: isPhone ? screenSize.width - 56 : 520,
+            height: isPhone ? screenSize.height * .66 : null,
             child: SingleChildScrollView(
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -146,27 +154,17 @@ class _QuestionnaireShareDialogState
                       value: _contact,
                       onChanged:
                           _busy ? null : (v) => setState(() => _contact = v)),
-                  if (billing.hasUnlimitedQuestionnaires)
-                    DropdownButtonFormField<int>(
-                        initialValue: _days,
-                        decoration: const InputDecoration(
-                            labelText: 'Accept responses for'),
-                        items: [7, 30, 90, 365]
-                            .map((d) => DropdownMenuItem(
-                                value: d, child: Text('$d days')))
-                            .toList(),
-                        onChanged: _busy
-                            ? null
-                            : (v) => setState(() => _days = v ?? 30))
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(10)),
-                      child: const Text(
-                          'Free plan: this link stays online for 5 minutes. Another link can be published after 7 days.'),
-                    ),
+                  DropdownButtonFormField<int>(
+                    initialValue: _days,
+                    decoration: const InputDecoration(
+                        labelText: 'Accept responses for'),
+                    items: [7, 30, 90, 365]
+                        .map((d) =>
+                            DropdownMenuItem(value: d, child: Text('$d days')))
+                        .toList(),
+                    onChanged:
+                        _busy ? null : (v) => setState(() => _days = v ?? 30),
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                       'Anyone with this public link can respond. Participants cannot see other answers. The link accepts up to 10,000 submissions.'),
@@ -201,7 +199,7 @@ class _QuestionnaireShareDialogState
                           child: const Text('Open participant view')),
                     ]),
                     const Text(
-                        'Public links become reachable after GitHub Pages and the domain are connected.'),
+                        'After deploying your questions to a public link, share the link with your participants.'),
                   ],
                   if (_error != null)
                     Padding(

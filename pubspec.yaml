@@ -27,6 +27,7 @@ dependencies:
 
   # Supabase (cloud sync)
   supabase_flutter: ^2.3.4
+  google_sign_in: ^7.2.0
 
   # Charts & Analytics
   fl_chart: ^1.2.0
@@ -86,7 +87,6 @@ flutter:
   assets:
     - .env
     - app_logo.png
-    - kuphanda.png
     - assets/images/
     - assets/icons/
     - assets/lottie/

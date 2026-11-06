@@ -1,12 +1,30 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/models/app_models.dart';
+import '../../../core/database/app_database.dart' show databaseProvider;
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
 import '../../../shared/theme/app_theme.dart';
+
+final _supervisedProjectIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const <String>{};
+  final projects = ref.watch(projectsProvider).projects;
+  final database = ref.watch(databaseProvider);
+  final supervisedIds = <String>{};
+  for (final project in projects) {
+    if (project.supervisorId == user.id ||
+        await database.getProjectMembershipRole(project.id) == 'supervisor') {
+      supervisedIds.add(project.id);
+    }
+  }
+  return supervisedIds;
+});
 
 class SupervisorScreen extends ConsumerWidget {
   const SupervisorScreen({super.key});
@@ -16,17 +34,37 @@ class SupervisorScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final projectsState = ref.watch(projectsProvider);
     final questionnairesState = ref.watch(questionnairesProvider);
+    final supervisedProjectsState = user?.role == UserRole.student
+        ? ref.watch(_supervisedProjectIdsProvider)
+        : null;
+    final supervisedProjects = supervisedProjectsState?.valueOrNull;
 
+    if ((supervisedProjectsState?.isLoading ?? false) &&
+        supervisedProjects == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final supervisedIds = supervisedProjectsState == null
+        ? null
+        : supervisedProjects ?? const <String>{};
+    final visibleQuestionnaires = questionnairesState.questionnaires.where(
+      (q) => supervisedIds == null || supervisedIds.contains(q.projectId),
+    );
     final pendingQuestionnaires =
-        questionnairesState.questionnaires.where((q) => !q.isApproved).toList();
+        visibleQuestionnaires.where((q) => !q.isApproved).toList();
     final approvedQuestionnaires =
-        questionnairesState.questionnaires.where((q) => q.isApproved).toList();
+        visibleQuestionnaires.where((q) => q.isApproved).toList();
+    final supervisedProjectCount = supervisedIds == null
+        ? projectsState.projects.length
+        : supervisedIds.length;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: LayoutBuilder(
+      body: PhoneWorkspace(child: LayoutBuilder(
         builder: (context, constraints) {
-          final isPhone = constraints.maxWidth < 600;
+          final isPhone = constraints.maxWidth < 900;
           return Padding(
             padding: EdgeInsets.all(isPhone ? 16 : 28),
             child: Column(
@@ -56,7 +94,7 @@ class SupervisorScreen extends ConsumerWidget {
                         children: [
                           _buildCountCard(
                             title: 'Supervised Projects',
-                            count: '${projectsState.projects.length}',
+                            count: '$supervisedProjectCount',
                             icon: Icons.folder_special_rounded,
                             color: const Color(0xFF1565C0),
                             bg: const Color(0xFFE3F2FD),
@@ -84,7 +122,7 @@ class SupervisorScreen extends ConsumerWidget {
                           Expanded(
                             child: _buildCountCard(
                               title: 'Supervised Projects',
-                              count: '${projectsState.projects.length}',
+                              count: '$supervisedProjectCount',
                               icon: Icons.folder_special_rounded,
                               color: const Color(0xFF1565C0),
                               bg: const Color(0xFFE3F2FD),
@@ -128,7 +166,8 @@ class SupervisorScreen extends ConsumerWidget {
                 Expanded(
                   child: pendingQuestionnaires.isEmpty
                       ? Center(
-                          child: Column(
+                          child: SingleChildScrollView(
+                              child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.thumb_up_alt_outlined,
@@ -149,7 +188,7 @@ class SupervisorScreen extends ConsumerWidget {
                                     color: Colors.grey.shade500, fontSize: 13),
                               ),
                             ],
-                          ),
+                          )),
                         )
                       : ListView.separated(
                           itemCount: pendingQuestionnaires.length,
@@ -228,7 +267,7 @@ class SupervisorScreen extends ConsumerWidget {
             ),
           );
         },
-      ),
+      )),
     );
   }
 
@@ -258,7 +297,8 @@ class SupervisorScreen extends ConsumerWidget {
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 16),
-          Column(
+          Expanded(
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -279,7 +319,7 @@ class SupervisorScreen extends ConsumerWidget {
                 ),
               ),
             ],
-          ),
+          )),
         ],
       ),
     );
@@ -313,7 +353,7 @@ class SupervisorScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRoleBadge(dynamic user) {
+  Widget _buildRoleBadge(AppUser? user) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(

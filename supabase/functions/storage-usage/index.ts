@@ -27,6 +27,10 @@ Deno.serve(async (req: Request) => {
     headers: { apikey: anon, Authorization: authorization },
   });
   if (!auth.ok) return json({ error: 'Your session expired.' }, 401);
+  const user = await auth.json();
+  if (typeof user.id !== 'string') {
+    return json({ error: 'Could not identify the signed-in account.' }, 401);
+  }
 
   const usage = await fetch(`${url}/rest/v1/rpc/get_storage_usage`, {
     method: 'POST',
@@ -35,15 +39,19 @@ Deno.serve(async (req: Request) => {
       Authorization: `Bearer ${serviceRole}`,
       'Content-Type': 'application/json',
     },
-    body: '{}',
+    body: JSON.stringify({ p_user_id: user.id }),
   });
-  if (!usage.ok) return json({ error: 'Unable to read Supabase usage.' }, 502);
+  if (!usage.ok) return json({ error: 'Unable to read storage usage.' }, 502);
 
   const rows = await usage.json();
   const row = Array.isArray(rows) ? rows[0] : rows;
   return json({
     databaseBytes: Number(row?.database_bytes ?? 0),
     storageBytes: Number(row?.storage_bytes ?? 0),
+    imageBytes: Number(row?.image_bytes ?? 0),
+    recordingBytes: Number(row?.recording_bytes ?? 0),
+    videoBytes: Number(row?.video_bytes ?? 0),
+    otherFileBytes: Number(row?.other_file_bytes ?? 0),
     measuredAt: new Date().toISOString(),
   });
 });

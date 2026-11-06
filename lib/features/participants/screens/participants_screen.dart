@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -157,36 +158,43 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(28),
+      body: PhoneWorkspace(
+          child: Padding(
+        padding:
+            EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Participant Registry & Ethics',
-                      style: GoogleFonts.poppins(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Manage anonymous codes, demographics, and informed consent records',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
+                SizedBox(
+                    width: MediaQuery.sizeOf(context).width < 600
+                        ? MediaQuery.sizeOf(context).width - 32
+                        : 460,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Participant Registry & Ethics',
+                          style: GoogleFonts.poppins(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Manage anonymous codes, demographics, and informed consent records',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    )),
                 ElevatedButton.icon(
                   onPressed: () => _showAddParticipantDialog(context),
                   icon: const Icon(Icons.person_add_rounded),
@@ -203,9 +211,14 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
             const SizedBox(height: 24),
 
             // Search & Filter
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Expanded(
+                SizedBox(
+                  width: MediaQuery.sizeOf(context).width < 600
+                      ? MediaQuery.sizeOf(context).width - 32
+                      : 400,
                   child: TextField(
                     decoration: InputDecoration(
                       hintText:
@@ -221,21 +234,27 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                     onChanged: (v) => setState(() => _search = v),
                   ),
                 ),
-                const SizedBox(width: 16),
                 if (projects.isNotEmpty)
-                  DropdownButton<String?>(
-                    value: _selectedProjectId,
-                    hint: const Text('All Projects'),
-                    items: [
-                      const DropdownMenuItem(
-                          value: null, child: Text('All Projects')),
-                      ...projects.map((p) => DropdownMenuItem(
-                            value: p.id,
-                            child: Text(p.title),
-                          )),
-                    ],
-                    onChanged: (v) => setState(() => _selectedProjectId = v),
-                  ),
+                  SizedBox(
+                      width: MediaQuery.sizeOf(context).width < 600
+                          ? MediaQuery.sizeOf(context).width - 32
+                          : 220,
+                      child: DropdownButton<String?>(
+                        isExpanded: true,
+                        value: _selectedProjectId,
+                        hint: const Text('All Projects'),
+                        items: [
+                          const DropdownMenuItem(
+                              value: null, child: Text('All Projects')),
+                          ...projects.map((p) => DropdownMenuItem(
+                                value: p.id,
+                                child: Text(p.title,
+                                    overflow: TextOverflow.ellipsis),
+                              )),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _selectedProjectId = v),
+                      )),
               ],
             ),
             const SizedBox(height: 24),
@@ -280,86 +299,104 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
                           separatorBuilder: (_, __) => const Divider(),
                           itemBuilder: (context, idx) {
                             final p = participants[idx];
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor:
-                                    AppTheme.kPrimary.withOpacity(0.1),
-                                child: Text(
-                                  p.code.replaceAll('P-', ''),
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.kPrimary,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                '${p.code} — ${p.name}',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${p.phone ?? "No phone"} • Registered: ${p.createdAt.toIso8601String().split('T').first}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: p.hasConsented
-                                          ? Colors.green.shade50
-                                          : Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: p.hasConsented
-                                            ? Colors.green.shade300
-                                            : Colors.red.shade300,
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor:
+                                            AppTheme.kPrimary.withOpacity(0.1),
+                                        child: const Icon(Icons.person_outline,
+                                            color: AppTheme.kPrimary),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          p.hasConsented
-                                              ? Icons.check_circle_rounded
-                                              : Icons.cancel_rounded,
-                                          size: 14,
-                                          color: p.hasConsented
-                                              ? Colors.green.shade700
-                                              : Colors.red.shade700,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          p.hasConsented
-                                              ? 'CONSENTED'
-                                              : 'NO CONSENT',
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          p.name.isEmpty
+                                              ? 'Anonymous participant'
+                                              : p.name,
                                           style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(p.code,
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${p.phone ?? "No phone"} • Registered: ${p.createdAt.toIso8601String().split('T').first}',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: p.hasConsented
+                                              ? Colors.green.shade50
+                                              : Colors.red.shade50,
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
                                             color: p.hasConsented
-                                                ? Colors.green.shade700
-                                                : Colors.red.shade700,
+                                                ? Colors.green.shade300
+                                                : Colors.red.shade300,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline,
-                                        color: Colors.red, size: 20),
-                                    onPressed: () {
-                                      ref
-                                          .read(participantsProvider.notifier)
-                                          .deleteParticipant(p.id,
-                                              projectId: p.projectId);
-                                    },
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              p.hasConsented
+                                                  ? Icons.check_circle_rounded
+                                                  : Icons.cancel_rounded,
+                                              size: 14,
+                                              color: p.hasConsented
+                                                  ? Colors.green.shade700
+                                                  : Colors.red.shade700,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              p.hasConsented
+                                                  ? 'CONSENTED'
+                                                  : 'NO CONSENT',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: p.hasConsented
+                                                    ? Colors.green.shade700
+                                                    : Colors.red.shade700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline,
+                                            color: Colors.red, size: 20),
+                                        onPressed: () {
+                                          ref
+                                              .read(
+                                                  participantsProvider.notifier)
+                                              .deleteParticipant(p.id,
+                                                  projectId: p.projectId);
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -369,7 +406,7 @@ class _ParticipantsScreenState extends ConsumerState<ParticipantsScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

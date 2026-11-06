@@ -16,8 +16,9 @@ class ChartExplorer extends ConsumerStatefulWidget {
 }
 
 class _ChartExplorerState extends ConsumerState<ChartExplorer> {
-  String type = 'Bar';
+  String? selectedType;
   bool percent = false;
+  bool percentOfRespondents = false;
   final boundary = GlobalKey();
   String? error;
 
@@ -57,11 +58,39 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
-    final numeric = result.mean != null;
+    final numeric = const {
+      QuestionType.number,
+      QuestionType.rating,
+      QuestionType.likertScale,
+    }.contains(result.type);
+    final isDate = result.type == QuestionType.date;
+    final isMultiSelect = result.type == QuestionType.multipleChoice;
+    final type = selectedType ??
+        (numeric
+            ? 'Histogram'
+            : isDate
+                ? 'Line'
+                : 'Bar');
+    final isPie = type == 'Pie' || type == 'Donut';
+    final supportsPercent = type != 'Box plot';
+    final usePercent = percent && supportsPercent;
+    final useRespondentPercent =
+        isMultiSelect && percentOfRespondents && !isPie;
     final settings = ref.watch(appSettingsProvider);
     var labels = result.chartData.map((e) => e['label'].toString()).toList();
     var counts =
         result.chartData.map((e) => (e['value'] as num).toDouble()).toList();
+    if (!numeric && !isDate && labels.length > 1) {
+      final order = List.generate(labels.length, (index) => index)
+        ..sort((a, b) => counts[b].compareTo(counts[a]));
+      labels = order.map((index) => labels[index]).toList();
+      counts = order.map((index) => counts[index]).toList();
+      if (labels.length > 12) {
+        final otherCount = counts.skip(11).fold<double>(0, (a, b) => a + b);
+        labels = [...labels.take(11), 'Other (${labels.length - 11} options)'];
+        counts = [...counts.take(11), otherCount];
+      }
+    }
     if (type == 'Histogram' && numeric && labels.isNotEmpty) {
       final values = labels.map(double.tryParse).toList();
       final valid = [
@@ -86,13 +115,29 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
       }
     }
     final total = counts.fold<double>(0, (a, b) => a + b);
-    final values =
-        counts.map((n) => percent && total > 0 ? n * 100 / total : n).toList();
-    final axis = percent
-        ? 'Percent of recorded selections'
-        : 'Frequency (recorded selections)';
+    final percentDenominator =
+        useRespondentPercent ? result.respondentCount.toDouble() : total;
+    final values = counts
+        .map((n) => usePercent && percentDenominator > 0
+            ? n * 100 / percentDenominator
+            : n)
+        .toList();
+    final axis = type == 'Box plot'
+        ? 'Raw numeric scale'
+        : usePercent
+            ? useRespondentPercent
+                ? 'Percent of respondents (may exceed 100% total)'
+                : isMultiSelect
+                    ? 'Percent of all selections'
+                    : 'Percent of answered records'
+            : isMultiSelect
+                ? 'Frequency (recorded selections)'
+                : 'Frequency (responses)';
     final labelList = labels;
     final countList = counts;
+    final axisInterval = isDate && labels.length > 24
+        ? (labels.length / 12).ceilToDouble()
+        : 1.0;
     final colors = _chartColors(
         settings.chartPalette, math.max(1, labels.length), result.questionId);
     Widget plot;
@@ -100,6 +145,21 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
       plot = const SizedBox(
           height: 180,
           child: Center(child: Text('No valid responses to chart.')));
+    } else if (type == 'Box plot' && numeric) {
+      plot = SizedBox(
+        height: 180,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _BoxPlotPainter(
+            min: result.min ?? 0,
+            q1: result.q1 ?? result.min ?? 0,
+            median: result.median ?? result.mean ?? 0,
+            q3: result.q3 ?? result.max ?? 0,
+            max: result.max ?? 0,
+            color: const Color(0xFF00897B),
+          ),
+        ),
+      );
     } else if (type == 'Pie' || type == 'Donut') {
       plot = SizedBox(
           height: 280,
@@ -108,12 +168,14 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
               sections: List.generate(
                   values.length,
                   (i) => PieChartSectionData(
-                      value: counts[i],
+                      value: values[i],
                       color: colors[i % colors.length],
                       radius: 105,
-                      title: counts[i] / total < .03
-                          ? ''
-                          : '${(counts[i] * 100 / total).toStringAsFixed(1)}%',
+                      title: usePercent
+                          ? percentDenominator > 0
+                              ? '${(counts[i] * 100 / percentDenominator).toStringAsFixed(1)}%'
+                              : '0%'
+                          : counts[i].toStringAsFixed(0),
                       titleStyle: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -136,7 +198,8 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                             color: colors[i % colors.length],
                             backgroundColor: Colors.grey.shade100)),
                     const SizedBox(width: 8),
-                    Text(values[i].toStringAsFixed(percent ? 1 : 0))
+                    Text(
+                        '${values[i].toStringAsFixed(usePercent ? 1 : 0)}${usePercent ? '%' : ''}')
                   ]))));
     } else {
       final maxY = values.reduce(math.max) * 1.15;
@@ -154,17 +217,24 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
               axisNameWidget: Text(
                   isHistogram
                       ? 'Continuous value intervals'
-                      : 'Response categories (see numbered key below)',
+                      : isDate
+                          ? 'Month of recorded date'
+                          : 'Response categories (see numbered key below)',
                   style: const TextStyle(fontSize: 11)),
               axisNameSize: 25,
               sideTitles: SideTitles(
                   showTitles: true,
                   reservedSize: 25,
-                  interval: 1,
+                  interval: axisInterval,
                   getTitlesWidget: (v, m) =>
                       v == v.roundToDouble() && v >= 0 && v < labels.length
-                          ? Text('${v.toInt() + 1}',
-                              style: const TextStyle(fontSize: 11))
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                isDate ? labels[v.toInt()] : '${v.toInt() + 1}',
+                                style: TextStyle(fontSize: isDate ? 9 : 11),
+                              ),
+                            )
                           : const SizedBox.shrink())));
       final chart = type == 'Line'
           ? LineChart(LineChartData(
@@ -205,7 +275,7 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                       getTooltipColor: (_) => const Color(0xFF1E293B),
                       getTooltipItem: (group, groupIndex, rod, rodIndex) =>
                           BarTooltipItem(
-                              '${labels[group.x]}\n${rod.toY.toStringAsFixed(percent ? 1 : 0)}${percent ? '%' : ''}',
+                              '${labels[group.x]}\n${rod.toY.toStringAsFixed(usePercent ? 1 : 0)}${usePercent ? '%' : ''}',
                               const TextStyle(color: Colors.white)))),
               barGroups: List.generate(
                   values.length,
@@ -226,7 +296,12 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
           child: SizedBox(
               width: math.max(
                   MediaQuery.sizeOf(context).width > 1000 ? 650 : 300,
-                  labels.length * (type == 'Histogram' ? 40.0 : 52.0)),
+                  labels.length *
+                      (type == 'Histogram'
+                          ? 40.0
+                          : isDate
+                              ? (labels.length > 24 ? 36.0 : 78.0)
+                              : 52.0)),
               height: 280,
               child: chart));
     }
@@ -247,17 +322,39 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                           'Horizontal bar',
                           'Pie',
                           'Donut',
-                          if (numeric) 'Line',
-                          if (numeric) 'Histogram'
+                          if (numeric) 'Histogram',
+                          if (numeric) 'Box plot',
+                          if (numeric || isDate) 'Line'
                         ]
                             .map((v) =>
                                 DropdownMenuItem(value: v, child: Text(v)))
                             .toList(),
-                        onChanged: (v) => setState(() => type = v!)),
-                    FilterChip(
-                        label: const Text('Percentages'),
-                        selected: percent,
-                        onSelected: (v) => setState(() => percent = v)),
+                        onChanged: (v) => setState(() => selectedType = v)),
+                    if (supportsPercent)
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(value: false, label: Text('Counts')),
+                          ButtonSegment(value: true, label: Text('Percent')),
+                        ],
+                        selected: {percent},
+                        onSelectionChanged: (selection) =>
+                            setState(() => percent = selection.first),
+                      ),
+                    if (isMultiSelect && percent && !isPie)
+                      DropdownButton<bool>(
+                        value: percentOfRespondents,
+                        items: const [
+                          DropdownMenuItem(
+                              value: false, child: Text('% of selections')),
+                          DropdownMenuItem(
+                              value: true, child: Text('% of respondents')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => percentOfRespondents = value);
+                          }
+                        },
+                      ),
                     TextButton.icon(
                         icon: const Icon(Icons.download),
                         label: const Text('Save figure'),
@@ -297,9 +394,26 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                             Text('Answered records: ${result.count} • $axis',
                                 style: const TextStyle(
                                     color: Colors.black54, fontSize: 12)),
-                            if (type == 'Line')
+                            if (isMultiSelect)
+                              Text(
+                                  useRespondentPercent
+                                      ? 'Each option is divided by the number of respondents; percentages can total above 100% because participants may select multiple options.'
+                                      : 'Each option is divided by all recorded selections. Respondents can select more than one option.',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.black54)),
+                            if (type == 'Box plot')
+                              Text(
+                                  'Whiskers show observed minimum and maximum; the box shows Q1 to Q3 with the median line. ${result.outlierCount} potential IQR outlier(s) flagged.',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.black54)),
+                            if (type == 'Line' && numeric)
                               const Text(
                                   'Numeric values in ascending order; this is a frequency distribution, not a time trend.',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.black54)),
+                            if (type == 'Line' && isDate)
+                              const Text(
+                                  'Counts of dates recorded by participants, grouped by calendar month. Months without dates are shown as zero.',
                                   style: TextStyle(
                                       fontSize: 11, color: Colors.black54)),
                             if (type == 'Histogram')
@@ -310,40 +424,128 @@ class _ChartExplorerState extends ConsumerState<ChartExplorer> {
                             const SizedBox(height: 16),
                             plot,
                             const SizedBox(height: 12),
-                            ...List.generate(
-                                labelList.length,
-                                (i) => Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 3),
-                                    child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                              width: 12,
-                                              height: 12,
-                                              margin: const EdgeInsets.only(
-                                                  top: 3, right: 8),
-                                              decoration: BoxDecoration(
-                                                  color: type == 'Histogram'
-                                                      ? const Color(0xFF00897B)
-                                                      : colors[i],
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          2))),
-                                          Expanded(
-                                              child: Text(
-                                                  '${i + 1}. ${labelList[i]}',
-                                                  style: const TextStyle(
-                                                      color: Colors.black87))),
-                                          Text(
-                                              '${countList[i].toInt()}  (${total > 0 ? (countList[i] * 100 / total).toStringAsFixed(1) : '0'}%)',
-                                              style: const TextStyle(
-                                                  color: Colors.black87))
-                                        ]))),
+                            if (type != 'Box plot')
+                              ...List.generate(
+                                  labelList.length,
+                                  (i) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 3),
+                                      child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                                width: 12,
+                                                height: 12,
+                                                margin: const EdgeInsets.only(
+                                                    top: 3, right: 8),
+                                                decoration: BoxDecoration(
+                                                    color: type == 'Histogram'
+                                                        ? const Color(
+                                                            0xFF00897B)
+                                                        : colors[i],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            2))),
+                                            Expanded(
+                                                child: Text(
+                                                    '${i + 1}. ${labelList[i]}',
+                                                    style: const TextStyle(
+                                                        color:
+                                                            Colors.black87))),
+                                            Text(
+                                                usePercent
+                                                    ? '${values[i].toStringAsFixed(1)}%  (n=${countList[i].toInt()})'
+                                                    : '${countList[i].toInt()} responses',
+                                                style: const TextStyle(
+                                                    color: Colors.black87))
+                                          ]))),
                           ]))),
               if (error != null)
                 Text(error!, style: const TextStyle(color: Colors.red)),
             ])));
   }
+}
+
+class _BoxPlotPainter extends CustomPainter {
+  const _BoxPlotPainter({
+    required this.min,
+    required this.q1,
+    required this.median,
+    required this.q3,
+    required this.max,
+    required this.color,
+  });
+
+  final double min;
+  final double q1;
+  final double median;
+  final double q3;
+  final double max;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const horizontalPadding = 28.0;
+    final low = math.min(min, max);
+    final high = math.max(min, max);
+    final spread = high - low;
+    final usableWidth = size.width - horizontalPadding * 2;
+    double x(double value) =>
+        horizontalPadding +
+        (spread == 0 ? .5 : (value - low) / spread) * usableWidth;
+    final centerY = size.height * .42;
+    final line = Paint()
+      ..color = color
+      ..strokeWidth = 2;
+    final box = Paint()
+      ..color = color.withOpacity(.18)
+      ..style = PaintingStyle.fill;
+    final border = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    canvas.drawLine(Offset(x(min), centerY), Offset(x(max), centerY), line);
+    canvas.drawLine(
+        Offset(x(min), centerY - 12), Offset(x(min), centerY + 12), line);
+    canvas.drawLine(
+        Offset(x(max), centerY - 12), Offset(x(max), centerY + 12), line);
+    final rect = Rect.fromLTRB(x(q1), centerY - 25, x(q3), centerY + 25);
+    canvas.drawRect(rect, box);
+    canvas.drawRect(rect, border);
+    canvas.drawLine(
+        Offset(x(median), centerY - 25), Offset(x(median), centerY + 25), line);
+
+    final points = <(String, double)>[
+      ('Min', min),
+      ('Q1', q1),
+      ('Median', median),
+      ('Q3', q3),
+      ('Max', max),
+    ];
+    for (final point in points) {
+      final text = TextPainter(
+        text: TextSpan(
+          text: '${point.$1}\n${point.$2.toStringAsPrecision(4)}',
+          style: const TextStyle(fontSize: 10, color: Color(0xFF334155)),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 72);
+      final dx = (x(point.$2) - text.width / 2)
+          .clamp(0.0, size.width - text.width)
+          .toDouble();
+      text.paint(canvas, Offset(dx, centerY + 38));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BoxPlotPainter oldDelegate) =>
+      min != oldDelegate.min ||
+      q1 != oldDelegate.q1 ||
+      median != oldDelegate.median ||
+      q3 != oldDelegate.q3 ||
+      max != oldDelegate.max ||
+      color != oldDelegate.color;
 }

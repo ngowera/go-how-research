@@ -4,10 +4,19 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/projects_provider.dart';
 import 'analytics_screen.dart';
 
-class AnalysisProjectPicker extends ConsumerWidget {
+class AnalysisProjectPicker extends ConsumerStatefulWidget {
   const AnalysisProjectPicker({super.key});
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnalysisProjectPicker> createState() =>
+      _AnalysisProjectPickerState();
+}
+
+class _AnalysisProjectPickerState extends ConsumerState<AnalysisProjectPicker> {
+  String? _redirectingTo;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(projectsProvider);
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -26,6 +35,16 @@ class AnalysisProjectPicker extends ConsumerWidget {
     }
     final projects = [...state.projects]
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return AnalyticsScreen(projectId: projects.first.id);
+    final projectId = projects.first.id;
+    if (_redirectingTo != projectId) {
+      _redirectingTo = projectId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/analytics/$projectId');
+      });
+    }
+    return AnalyticsScreen(
+      key: ValueKey('analytics-project-$projectId'),
+      projectId: projectId,
+    );
   }
 }

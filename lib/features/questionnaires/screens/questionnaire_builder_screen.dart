@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -67,7 +68,8 @@ class _QuestionnaireBuilderScreenState
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Column(
+      body: PhoneWorkspace(
+          child: Column(
         children: [
           // ── Top Header Toolbar ─────────────────────────────────────────────
           Container(
@@ -76,8 +78,9 @@ class _QuestionnaireBuilderScreenState
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 Row(
                   children: [
@@ -86,29 +89,35 @@ class _QuestionnaireBuilderScreenState
                       onPressed: () => context.go('/questionnaires'),
                     ),
                     const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          questionnaire?.title ?? 'Questionnaire Builder',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
-                          ),
-                        ),
-                        Text(
-                          '${questions.length} questions • Version ${questionnaire?.version ?? 1}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    SizedBox(
+                        width: MediaQuery.sizeOf(context).width < 600
+                            ? MediaQuery.sizeOf(context).width - 112
+                            : 460,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              questionnaire?.title ?? 'Questionnaire Builder',
+                              style: GoogleFonts.poppins(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              '${questions.length} questions • Version ${questionnaire?.version ?? 1}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        )),
                   ],
                 ),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     OutlinedButton.icon(
                       onPressed: () {
@@ -145,94 +154,112 @@ class _QuestionnaireBuilderScreenState
             ),
           ),
 
+          if (MediaQuery.sizeOf(context).width < 900)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: DropdownButtonFormField<QuestionType>(
+                isExpanded: true,
+                decoration: const InputDecoration(
+                    labelText: 'Add question type',
+                    border: OutlineInputBorder()),
+                items: QuestionType.values
+                    .map((type) =>
+                        DropdownMenuItem(value: type, child: Text(type.name)))
+                    .toList(),
+                onChanged: (type) {
+                  if (type != null) _addQuestion(type);
+                },
+              ),
+            ),
           // ── Main Workspace ─────────────────────────────────────────────────
           Expanded(
             child: Row(
               children: [
                 // Left: Question Types Palette
-                Container(
-                  width: 240,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border:
-                        Border(right: BorderSide(color: Colors.grey.shade200)),
-                  ),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      Text(
-                        'ADD QUESTION',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey.shade500,
-                          letterSpacing: 1,
+                if (MediaQuery.sizeOf(context).width >= 900)
+                  Container(
+                    width: 240,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                          right: BorderSide(color: Colors.grey.shade200)),
+                    ),
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        Text(
+                          'ADD QUESTION',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey.shade500,
+                            letterSpacing: 1,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPaletteButton(
-                        'Text Response',
-                        Icons.text_fields_rounded,
-                        const Color(0xFF1565C0),
-                        () => _addQuestion(QuestionType.text),
-                      ),
-                      _buildPaletteButton(
-                        'Number / Value',
-                        Icons.numbers_rounded,
-                        const Color(0xFF00897B),
-                        () => _addQuestion(QuestionType.number),
-                      ),
-                      _buildPaletteButton(
-                        'Single Choice',
-                        Icons.radio_button_checked_rounded,
-                        const Color(0xFFF57C00),
-                        () => _addQuestion(QuestionType.singleChoice),
-                      ),
-                      _buildPaletteButton(
-                        'Multiple Choice',
-                        Icons.check_box_rounded,
-                        const Color(0xFF7B1FA2),
-                        () => _addQuestion(QuestionType.multipleChoice),
-                      ),
-                      _buildPaletteButton(
-                        'Likert Scale (1-5)',
-                        Icons.linear_scale_rounded,
-                        const Color(0xFF2E7D32),
-                        () => _addQuestion(QuestionType.likertScale),
-                      ),
-                      _buildPaletteButton(
-                        'Star Rating',
-                        Icons.star_rounded,
-                        Colors.amber.shade700,
-                        () => _addQuestion(QuestionType.rating),
-                      ),
-                      _buildPaletteButton(
-                        'Yes / No',
-                        Icons.toggle_on_rounded,
-                        const Color(0xFFD81B60),
-                        () => _addQuestion(QuestionType.yesNo),
-                      ),
-                      _buildPaletteButton(
-                        'Thumbs Up / Down',
-                        Icons.thumb_up_alt_rounded,
-                        const Color(0xFF6D4C41),
-                        () => _addQuestion(QuestionType.thumbs),
-                      ),
-                      _buildPaletteButton(
-                        'Date Picker',
-                        Icons.calendar_today_rounded,
-                        const Color(0xFF0288D1),
-                        () => _addQuestion(QuestionType.date),
-                      ),
-                      _buildPaletteButton(
-                        'Matrix / Grid',
-                        Icons.grid_on_rounded,
-                        const Color(0xFF5E35B1),
-                        () => _addQuestion(QuestionType.matrix),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        _buildPaletteButton(
+                          'Text Response',
+                          Icons.text_fields_rounded,
+                          const Color(0xFF1565C0),
+                          () => _addQuestion(QuestionType.text),
+                        ),
+                        _buildPaletteButton(
+                          'Number / Value',
+                          Icons.numbers_rounded,
+                          const Color(0xFF00897B),
+                          () => _addQuestion(QuestionType.number),
+                        ),
+                        _buildPaletteButton(
+                          'Single Choice',
+                          Icons.radio_button_checked_rounded,
+                          const Color(0xFFF57C00),
+                          () => _addQuestion(QuestionType.singleChoice),
+                        ),
+                        _buildPaletteButton(
+                          'Multiple Choice',
+                          Icons.check_box_rounded,
+                          const Color(0xFF7B1FA2),
+                          () => _addQuestion(QuestionType.multipleChoice),
+                        ),
+                        _buildPaletteButton(
+                          'Likert Scale (1-5)',
+                          Icons.linear_scale_rounded,
+                          const Color(0xFF2E7D32),
+                          () => _addQuestion(QuestionType.likertScale),
+                        ),
+                        _buildPaletteButton(
+                          'Star Rating',
+                          Icons.star_rounded,
+                          Colors.amber.shade700,
+                          () => _addQuestion(QuestionType.rating),
+                        ),
+                        _buildPaletteButton(
+                          'Yes / No',
+                          Icons.toggle_on_rounded,
+                          const Color(0xFFD81B60),
+                          () => _addQuestion(QuestionType.yesNo),
+                        ),
+                        _buildPaletteButton(
+                          'Thumbs Up / Down',
+                          Icons.thumb_up_alt_rounded,
+                          const Color(0xFF6D4C41),
+                          () => _addQuestion(QuestionType.thumbs),
+                        ),
+                        _buildPaletteButton(
+                          'Date Picker',
+                          Icons.calendar_today_rounded,
+                          const Color(0xFF0288D1),
+                          () => _addQuestion(QuestionType.date),
+                        ),
+                        _buildPaletteButton(
+                          'Matrix / Grid',
+                          Icons.grid_on_rounded,
+                          const Color(0xFF5E35B1),
+                          () => _addQuestion(QuestionType.matrix),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
                 // Center: Questions Editor List
                 Expanded(
@@ -255,7 +282,8 @@ class _QuestionnaireBuilderScreenState
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Click any question type on the left panel to add your first question',
+                                'Choose a question type to start building your questionnaire',
+                                textAlign: TextAlign.center,
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   color: Colors.grey.shade500,
@@ -290,103 +318,104 @@ class _QuestionnaireBuilderScreenState
                 ),
 
                 // Right: Quick Live Preview & Guide
-                Container(
-                  width: 300,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border:
-                        Border(left: BorderSide(color: Colors.grey.shade200)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.lightbulb_outline_rounded,
-                                color: Colors.amber, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Survey Tips',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1E293B),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        _buildTip(
-                          'Keep questions concise',
-                          'Direct questions yield higher completion rates and fewer skipped items.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTip(
-                          'Use standard Likert scales',
-                          '5-point scales (Strongly Disagree to Strongly Agree) make descriptive statistics easy to compute.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildTip(
-                          'Required fields',
-                          'Mark key variables as required so data quality scores remain high during automated analysis.',
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppTheme.kPrimary.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: AppTheme.kPrimary.withOpacity(0.2)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                if (MediaQuery.sizeOf(context).width >= 1100)
+                  Container(
+                    width: 300,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border:
+                          Border(left: BorderSide(color: Colors.grey.shade200)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
+                              const Icon(Icons.lightbulb_outline_rounded,
+                                  color: Colors.amber, size: 20),
+                              const SizedBox(width: 8),
                               Text(
-                                'Ready to test?',
+                                'Survey Tips',
                                 style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                  color: AppTheme.kPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Open the data collection form to test responses immediately.',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    context.go(
-                                        '/data-collection/${widget.questionnaireId}');
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.kPrimary,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Open Collection Form'),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 14),
+                          _buildTip(
+                            'Keep questions concise',
+                            'Direct questions yield higher completion rates and fewer skipped items.',
+                          ),
+                          const SizedBox(height: 10),
+                          _buildTip(
+                            'Use standard Likert scales',
+                            '5-point scales (Strongly Disagree to Strongly Agree) make descriptive statistics easy to compute.',
+                          ),
+                          const SizedBox(height: 10),
+                          _buildTip(
+                            'Required fields',
+                            'Mark key variables as required so data quality scores remain high during automated analysis.',
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.kPrimary.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: AppTheme.kPrimary.withOpacity(0.2)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ready to test?',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    color: AppTheme.kPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Open the data collection form to test responses immediately.',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      context.go(
+                                          '/data-collection/${widget.questionnaireId}');
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.kPrimary,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Open Collection Form'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 

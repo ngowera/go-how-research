@@ -129,7 +129,12 @@ class StatisticsUtils {
     final colList = colKeys.toList();
 
     if (rowKeys.length < 2 || colList.length < 2) {
-      return {'chiSquare': 0.0, 'degreesOfFreedom': 0.0, 'pValue': 1.0};
+      return {
+        'testAvailable': 0.0,
+        'chiSquare': 0.0,
+        'degreesOfFreedom': 0.0,
+        'pValue': double.nan,
+      };
     }
 
     final rowTotals = <String, int>{};
@@ -147,7 +152,12 @@ class StatisticsUtils {
     }
 
     if (grandTotal == 0) {
-      return {'chiSquare': 0.0, 'degreesOfFreedom': 0.0, 'pValue': 1.0};
+      return {
+        'testAvailable': 0.0,
+        'chiSquare': 0.0,
+        'degreesOfFreedom': 0.0,
+        'pValue': double.nan,
+      };
     }
 
     double chiSquare = 0.0;
@@ -172,6 +182,7 @@ class StatisticsUtils {
     final cramerV = denominator > 0 ? math.sqrt(chiSquare / denominator) : 0.0;
 
     return {
+      'testAvailable': 1.0,
       'chiSquare': chiSquare,
       'degreesOfFreedom': df.toDouble(),
       'pValue': pValue,
@@ -332,6 +343,35 @@ class StatisticsUtils {
     };
   }
 
+  /// Spearman rank correlation with average ranks for ties.
+  static Map<String, double> spearmanCorrelationTest(
+      List<double> x, List<double> y) {
+    if (x.length != y.length || x.length < 3) {
+      return {'r': double.nan, 'pValue': double.nan, 'n': x.length.toDouble()};
+    }
+    List<double> ranks(List<double> values) {
+      final indexed = values.asMap().entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      final output = List<double>.filled(values.length, 0);
+      var start = 0;
+      while (start < indexed.length) {
+        var end = start + 1;
+        while (end < indexed.length &&
+            indexed[end].value == indexed[start].value) {
+          end++;
+        }
+        final rank = (start + 1 + end) / 2;
+        for (var i = start; i < end; i++) {
+          output[indexed[i].key] = rank;
+        }
+        start = end;
+      }
+      return output;
+    }
+
+    return pearsonCorrelationTest(ranks(x), ranks(y));
+  }
+
   /// Welch independent-samples t-test; equal variances are not assumed.
   static Map<String, double> welchTTest(
       List<double> first, List<double> second) {
@@ -404,7 +444,9 @@ class StatisticsUtils {
       'pValue': _studentTTwoTailedP(t.abs(), n - 1.0),
       'lower': ci[0],
       'upper': ci[1],
-      'dz': average / sd
+      'dz': average / sd,
+      'differenceMin': min(differences),
+      'differenceMax': max(differences),
     };
   }
 
@@ -441,12 +483,36 @@ class StatisticsUtils {
         variance(y) == 0) return {'slope': double.nan};
     final correlation = pearsonCorrelationTest(x, y), r = correlation['r']!;
     final slope = r * stdDev(y) / stdDev(x);
+    final intercept = mean(y) - slope * mean(x);
+    final residuals =
+        List.generate(x.length, (i) => y[i] - (intercept + slope * x[i]));
+    final residualStandardError = math.sqrt(residuals.fold<double>(
+            0, (sum, residual) => sum + residual * residual) /
+        (x.length - 2));
+    final xMean = mean(x);
+    final sxx = x.fold<double>(0, (sum, value) {
+      final difference = value - xMean;
+      return sum + difference * difference;
+    });
+    final slopeStandardError = residualStandardError / math.sqrt(sxx);
+    final degreesOfFreedom = x.length - 2;
+    final criticalT = meanConfidenceInterval95(0, 1, degreesOfFreedom + 1)[1] *
+        math.sqrt(degreesOfFreedom + 1);
+    final maxStandardizedResidual = residualStandardError == 0
+        ? 0.0
+        : residuals
+            .map((residual) => (residual / residualStandardError).abs())
+            .reduce(math.max);
     return {
       'slope': slope,
-      'intercept': mean(y) - slope * mean(x),
+      'intercept': intercept,
       'rSquared': r * r,
       'pValue': correlation['pValue']!,
-      'n': x.length.toDouble()
+      'n': x.length.toDouble(),
+      'residualStandardError': residualStandardError,
+      'maxStandardizedResidual': maxStandardizedResidual,
+      'slopeLower95': slope - criticalT * slopeStandardError,
+      'slopeUpper95': slope + criticalT * slopeStandardError,
     };
   }
 

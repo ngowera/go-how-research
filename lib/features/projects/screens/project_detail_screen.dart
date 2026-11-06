@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -115,8 +116,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(title: const Text('Project Not Found')),
-        body: Center(
-          child: Column(
+        body: PhoneWorkspace(
+            child: Center(
+          child: SingleChildScrollView(
+              child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text('Project not found or deleted'),
@@ -126,21 +129,24 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                 child: const Text('Back to Projects'),
               ),
             ],
-          ),
-        ),
+          )),
+        )),
       );
     }
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(28),
+      body: PhoneWorkspace(
+          child: Padding(
+        padding:
+            EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Nav & Title
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 Row(
                   children: [
@@ -149,29 +155,35 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                       onPressed: () => context.go('/projects'),
                     ),
                     const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          project.title,
-                          style: GoogleFonts.poppins(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
-                          ),
-                        ),
-                        Text(
-                          '${project.methodology} • Sample Size: ${project.sampleSize} • Status: ${project.status.name.toUpperCase()}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    SizedBox(
+                        width: MediaQuery.sizeOf(context).width < 600
+                            ? MediaQuery.sizeOf(context).width - 112
+                            : 460,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              project.title,
+                              style: GoogleFonts.poppins(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              '${project.methodology} • Sample Size: ${project.sampleSize} • Status: ${project.status.name.toUpperCase()}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        )),
                   ],
                 ),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     OutlinedButton.icon(
                       onPressed: () => context.go('/analytics/${project.id}'),
@@ -198,6 +210,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
             // Tab Bar
             TabBar(
               controller: _tabController,
+              isScrollable: true,
               labelColor: AppTheme.kPrimary,
               unselectedLabelColor: Colors.grey.shade600,
               indicatorColor: AppTheme.kPrimary,
@@ -319,7 +332,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                   // 2. Questionnaires Tab
                   questionnaires.isEmpty
                       ? Center(
-                          child: Column(
+                          child: SingleChildScrollView(
+                              child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.assignment_outlined,
@@ -345,52 +359,79 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                                   ),
                                 ),
                             ],
-                          ),
+                          )),
                         )
                       : ListView.separated(
                           itemCount: questionnaires.length,
                           separatorBuilder: (_, __) => const Divider(),
                           itemBuilder: (context, idx) {
                             final q = questionnaires[idx];
-                            return ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.kPrimary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.assignment_rounded,
-                                    color: AppTheme.kPrimary),
-                              ),
-                              title: Text(q.title,
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600)),
-                              subtitle: Text(
-                                  'Version ${q.version} • ${q.isApproved ? "Approved by supervisor" : "Draft / Pending approval"}',
-                                  style: GoogleFonts.poppins(fontSize: 12)),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  OutlinedButton.icon(
-                                    onPressed: () =>
-                                        context.go('/data-collection/${q.id}'),
-                                    icon: const Icon(Icons.edit_note_rounded,
-                                        size: 16),
-                                    label: const Text('Collect Data'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (canManageQuestionnaires)
-                                    ElevatedButton.icon(
-                                      onPressed: () => context.go(
-                                          '/questionnaires/${q.id}/builder'),
-                                      icon: const Icon(Icons.tune_rounded,
-                                          size: 16),
-                                      label: const Text('Open Builder'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.kPrimary,
-                                        foregroundColor: Colors.white,
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.kPrimary
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                            Icons.assignment_rounded,
+                                            color: AppTheme.kPrimary),
                                       ),
-                                    ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                          child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(q.title,
+                                              style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600)),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                              'Version ${q.version} • ${q.isApproved ? "Approved by supervisor" : "Draft / Pending approval"}',
+                                              style: GoogleFonts.poppins(
+                                                  fontSize: 12)),
+                                        ],
+                                      )),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () => context
+                                            .go('/data-collection/${q.id}'),
+                                        icon: const Icon(
+                                            Icons.edit_note_rounded,
+                                            size: 16),
+                                        label: const Text('Collect Data'),
+                                      ),
+                                      if (canManageQuestionnaires)
+                                        ElevatedButton.icon(
+                                          onPressed: () => context.go(
+                                              '/questionnaires/${q.id}/builder'),
+                                          icon: const Icon(Icons.tune_rounded,
+                                              size: 16),
+                                          label: const Text('Open Builder'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.kPrimary,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             );
@@ -399,7 +440,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
 
                   // 3. Responses & Data
                   Center(
-                    child: Column(
+                    child: SingleChildScrollView(
+                        child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.table_chart_rounded,
@@ -431,7 +473,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                           ),
                         ),
                       ],
-                    ),
+                    )),
                   ),
 
                   // 4. Team
@@ -441,7 +483,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Go-How RS
+Comment=Go-How Research
+Exec=gohow_research %u
+Terminal=false
+Type=Application
+Categories=Education;Science;
+MimeType=x-scheme-handler/gohowrs;

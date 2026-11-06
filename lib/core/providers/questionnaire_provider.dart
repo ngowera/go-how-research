@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -34,25 +36,43 @@ class QuestionnairesNotifier extends StateNotifier<QuestionnairesState> {
   final AppDatabase _db;
   final Ref _ref;
   static const _uuid = Uuid();
+  bool _hasLoaded = false;
 
   QuestionnairesNotifier(this._db, this._ref)
       : super(const QuestionnairesState()) {
     loadQuestionnaires();
     _ref.listen<DateTime?>(
-      syncProvider.select((sync) => sync.lastAttemptTime),
+      syncProvider.select((sync) => sync.lastSyncTime),
       (previous, next) {
-        if (next != null && next != previous) loadQuestionnaires();
+        if (next != null && next != previous) {
+          loadQuestionnaires(silent: true);
+        }
       },
     );
   }
 
-  Future<void> loadQuestionnaires({String? projectId}) async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> loadQuestionnaires(
+      {String? projectId, bool silent = false}) async {
+    if (!silent || !_hasLoaded) {
+      state = state.copyWith(isLoading: true, error: null);
+    }
     try {
       final list = await _db.getQuestionnaires(projectId: projectId);
+      _hasLoaded = true;
+      final sameData = list.length == state.questionnaires.length &&
+          jsonEncode(list.map((item) => item.toJson()).toList()) ==
+              jsonEncode(
+                  state.questionnaires.map((item) => item.toJson()).toList());
+      if (sameData) {
+        if (state.isLoading) state = state.copyWith(isLoading: false);
+        return;
+      }
       state = state.copyWith(questionnaires: list, isLoading: false);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: _hasLoaded ? null : e.toString(),
+      );
     }
   }
 
@@ -210,7 +230,7 @@ class QuestionsNotifier extends StateNotifier<List<Question>> {
   QuestionsNotifier(this._db, this._ref, this.questionnaireId) : super([]) {
     loadQuestions();
     _ref.listen<DateTime?>(
-      syncProvider.select((sync) => sync.lastAttemptTime),
+      syncProvider.select((sync) => sync.lastSyncTime),
       (previous, next) {
         if (next != null && next != previous) loadQuestions();
       },
@@ -219,6 +239,11 @@ class QuestionsNotifier extends StateNotifier<List<Question>> {
 
   Future<void> loadQuestions() async {
     final list = await _db.getQuestions(questionnaireId: questionnaireId);
+    if (list.length == state.length &&
+        jsonEncode(list.map((item) => item.toJson()).toList()) ==
+            jsonEncode(state.map((item) => item.toJson()).toList())) {
+      return;
+    }
     state = list;
   }
 

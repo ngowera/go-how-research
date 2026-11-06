@@ -78,13 +78,18 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
     final user = ref.watch(currentUserProvider),
         settings = ref.watch(appSettingsProvider);
     final notifier = ref.read(appSettingsProvider.notifier);
+    final isDesktop = MediaQuery.sizeOf(context).width > 800;
     return Card(
         child: Padding(
             padding: const EdgeInsets.all(18),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Your profile',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+              Align(
+                alignment: isDesktop ? Alignment.centerLeft : Alignment.center,
+                child: const Text('Your profile',
+                    style:
+                        TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+              ),
               const SizedBox(height: 12),
               Center(
                   child: InkWell(
@@ -99,21 +104,29 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
                   child: Text(user?.name ?? 'Researcher',
                       style: const TextStyle(
                           fontSize: 17, fontWeight: FontWeight.w700))),
+              if ((user?.email ?? '').isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Center(
+                  child: Text(
+                    user!.email,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  ),
+                ),
+              ],
               if (error != null)
                 Text(error!, style: const TextStyle(color: Colors.red)),
               const SizedBox(height: 14),
               const Text('Accent colour'),
               Wrap(
                   spacing: 8,
-                  children: [0xFF1565C0, 0xFF00897B, 0xFF7B1FA2, 0xFFAD4B00]
+                  children: [0xFF1565C0, 0xFF00897B, 0xFF7B1FA2]
                       .map((color) => ChoiceChip(
                           label: Text(color == 0xFF1565C0
                               ? 'Blue'
                               : color == 0xFF00897B
                                   ? 'Teal'
-                                  : color == 0xFF7B1FA2
-                                      ? 'Purple'
-                                      : 'Amber'),
+                                  : 'Purple'),
                           avatar: CircleAvatar(
                               backgroundColor: Color(color), radius: 7),
                           selected: settings.accentColor == color,
@@ -124,26 +137,61 @@ class _AppearanceCardState extends ConsumerState<AppearanceCard> {
               const Text('Sidebar colour'),
               Wrap(
                 spacing: 8,
-                children: (const [
-                  0xFFFFFFFF,
-                  0xFF000000,
-                  0xFF1565C0,
-                  0xFF00897B,
-                ])
+                children: (const [0xFFFFFFFF, 0xFF000000, 0xFF1565C0])
                     .map((color) => ChoiceChip(
                           label: Text(color == 0xFFFFFFFF
                               ? 'White'
                               : color == 0xFF000000
                                   ? 'Black'
-                                  : color == 0xFF1565C0
-                                      ? 'Blue'
-                                      : 'Teal'),
+                                  : 'Blue'),
                           avatar: CircleAvatar(
                               backgroundColor: Color(color), radius: 7),
                           selected: settings.sidebarColor == color,
                           onSelected: (_) => notifier.updateSidebarColor(color),
                         ))
                     .toList(),
+              ),
+              if (!isDesktop) ...[
+                const SizedBox(height: 16),
+                const Text('Navigation bar colour'),
+                const SizedBox(height: 6),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment<bool>(
+                      value: false,
+                      icon: Icon(Icons.light_mode_outlined),
+                      label: Text('Light'),
+                    ),
+                    ButtonSegment<bool>(
+                      value: true,
+                      icon: Icon(Icons.dark_mode_outlined),
+                      label: Text('Dark'),
+                    ),
+                  ],
+                  selected: {settings.darkNavigationBar},
+                  onSelectionChanged: (selection) =>
+                      notifier.updateNavigationBarStyle(dark: selection.first),
+                ),
+              ],
+              const SizedBox(height: 16),
+              const Text('Research assistant appearance'),
+              const SizedBox(height: 6),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment<bool>(
+                    value: false,
+                    icon: Icon(Icons.light_mode_outlined),
+                    label: Text('Light glass'),
+                  ),
+                  ButtonSegment<bool>(
+                    value: true,
+                    icon: Icon(Icons.dark_mode_outlined),
+                    label: Text('Dark glass'),
+                  ),
+                ],
+                selected: {settings.darkResearchAssistant},
+                onSelectionChanged: (selection) => notifier
+                    .updateResearchAssistantStyle(dark: selection.first),
               ),
             ])));
   }

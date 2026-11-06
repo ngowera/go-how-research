@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/app_settings_provider.dart';
-import '../../../core/providers/billing_provider.dart';
 import '../../../core/providers/participants_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
@@ -47,7 +47,6 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
 
     final responses = responsesState?.responses ?? [];
     final settings = ref.watch(appSettingsProvider);
-    final billing = ref.watch(billingProvider);
     final participantNames = {
       for (final participant in ref.watch(participantsProvider).participants)
         if (participant.projectId == widget.projectId &&
@@ -59,8 +58,10 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(28),
+      body: PhoneWorkspace(
+          child: Padding(
+        padding:
+            EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -108,13 +109,6 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                       onPressed: responses.isEmpty
                           ? null
                           : () async {
-                              if (!billing.hasExports) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Data exports require the Pro plan.')));
-                                return;
-                              }
                               final csvString = ExportUtils.toCSV(
                                   responses, questions,
                                   participantNames:
@@ -134,13 +128,6 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                       onPressed: responses.isEmpty
                           ? null
                           : () async {
-                              if (!billing.hasExports) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Excel and SPSS exports require the Pro plan.')));
-                                return;
-                              }
                               final bytes = ExportUtils.toExcel(
                                 responses,
                                 questions,
@@ -170,13 +157,6 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                       onPressed: responses.isEmpty
                           ? null
                           : () {
-                              if (!billing.hasExports) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Excel and SPSS exports require the Pro plan.')));
-                                return;
-                              }
                               showDialog<void>(
                                 context: context,
                                 builder: (_) => ExportDialog(
@@ -253,7 +233,8 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
             Expanded(
               child: responses.isEmpty
                   ? Center(
-                      child: Column(
+                      child: SingleChildScrollView(
+                          child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.table_rows_outlined,
@@ -286,7 +267,7 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
                               ),
                             ),
                         ],
-                      ),
+                      )),
                     )
                   : Container(
                       decoration: BoxDecoration(
@@ -385,7 +366,7 @@ class _DataTableScreenState extends ConsumerState<DataTableScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

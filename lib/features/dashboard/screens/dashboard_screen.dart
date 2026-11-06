@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../core/providers/questionnaire_provider.dart';
-import '../../../core/providers/sync_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -18,14 +17,17 @@ class DashboardScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final projectsState = ref.watch(projectsProvider);
     final questionnairesState = ref.watch(questionnairesProvider);
-    final syncState = ref.watch(syncProvider);
-
     final totalProjects = projectsState.projects.length;
+    final activeProjectCount = projectsState.projects
+        .where((project) => project.status.name == 'active')
+        .length;
     final totalQuestionnaires = questionnairesState.questionnaires.length;
     final activeProjects = projectsState.projects.take(4).toList();
 
     final greeting = _getGreeting();
     final todayStr = DateFormat('EEEE, MMMM d, y').format(DateTime.now());
+    final roleName = user?.role.name ?? 'student';
+    final roleLabel = '${roleName[0].toUpperCase()}${roleName.substring(1)}';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -39,15 +41,13 @@ class DashboardScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Top Header Bar ───────────────────────────────────────────────
-                isPhone
+                isCompact
                     ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildGreeting(
                               user?.name ?? 'Researcher', greeting, todayStr,
                               fontSize: 22),
-                          const SizedBox(height: 12),
-                          _buildSyncBadge(syncState, ref),
                         ],
                       )
                     : Row(
@@ -74,8 +74,6 @@ class DashboardScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          // Sync status badge
-                          _buildSyncBadge(syncState, ref),
                         ],
                       ),
                 const SizedBox(height: 28),
@@ -83,14 +81,15 @@ class DashboardScreen extends ConsumerWidget {
                 // ── Quick Stats Row ──────────────────────────────────────────────
                 isCompact
                     ? GridView.count(
-                        crossAxisCount: isPhone ? 2 : 4,
+                        crossAxisCount: constraints.maxWidth < 360 ? 1 : 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: isPhone ? 1.18 : 1.35,
+                        mainAxisExtent: 124,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
                           _buildStatCard(
+                              compact: true,
                               title: 'Total Projects',
                               value: '$totalProjects',
                               subtitle: 'Research studies',
@@ -102,7 +101,8 @@ class DashboardScreen extends ConsumerWidget {
                               ],
                               onTap: () => context.go('/projects')),
                           _buildStatCard(
-                              title: 'Questionnaires',
+                              compact: true,
+                              title: 'Forms',
                               value: '$totalQuestionnaires',
                               subtitle: 'Data instruments',
                               icon: Icons.assignment_rounded,
@@ -113,20 +113,22 @@ class DashboardScreen extends ConsumerWidget {
                               ],
                               onTap: () => context.go('/questionnaires')),
                           _buildStatCard(
-                              title: 'Offline Sync',
-                              value: '${syncState.pendingCount}',
-                              subtitle: 'Pending cloud sync',
-                              icon: Icons.cloud_sync_rounded,
+                              compact: true,
+                              title: 'Active Projects',
+                              value: '$activeProjectCount',
+                              subtitle: 'In progress',
+                              icon: Icons.play_circle_outline_rounded,
                               accentColor: const Color(0xFFF57C00),
                               bgGradient: const [
                                 Color(0xFFFFF3E0),
                                 Color(0xFFFFE0B2)
                               ],
-                              onTap: () => context.go('/settings')),
+                              onTap: () => context.go('/projects')),
                           _buildStatCard(
-                              title: 'Status',
-                              value: user?.role.name.toUpperCase() ?? 'STUDENT',
-                              subtitle: 'Active account',
+                              compact: true,
+                              title: 'Role',
+                              value: roleLabel,
+                              subtitle: 'Account type',
                               icon: Icons.verified_user_rounded,
                               accentColor: const Color(0xFF7B1FA2),
                               bgGradient: const [
@@ -155,7 +157,7 @@ class DashboardScreen extends ConsumerWidget {
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildStatCard(
-                              title: 'Questionnaires',
+                              title: 'Forms',
                               value: '$totalQuestionnaires',
                               subtitle: 'Data instruments',
                               icon: Icons.assignment_rounded,
@@ -170,24 +172,24 @@ class DashboardScreen extends ConsumerWidget {
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildStatCard(
-                              title: 'Offline Sync',
-                              value: '${syncState.pendingCount}',
-                              subtitle: 'Pending cloud sync',
-                              icon: Icons.cloud_sync_rounded,
+                              title: 'Active Projects',
+                              value: '$activeProjectCount',
+                              subtitle: 'In progress',
+                              icon: Icons.play_circle_outline_rounded,
                               accentColor: const Color(0xFFF57C00),
                               bgGradient: const [
                                 Color(0xFFFFF3E0),
                                 Color(0xFFFFE0B2)
                               ],
-                              onTap: () => context.go('/settings'),
+                              onTap: () => context.go('/projects'),
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildStatCard(
-                              title: 'Status',
-                              value: user?.role.name.toUpperCase() ?? 'STUDENT',
-                              subtitle: 'Active account',
+                              title: 'Role',
+                              value: roleLabel,
+                              subtitle: 'Account type',
                               icon: Icons.verified_user_rounded,
                               accentColor: const Color(0xFF7B1FA2),
                               bgGradient: const [
@@ -293,8 +295,9 @@ class DashboardScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 Text(
                                   'Recent Research Projects',
@@ -358,66 +361,109 @@ class DashboardScreen extends ConsumerWidget {
                                     const Divider(height: 20),
                                 itemBuilder: (context, idx) {
                                   final p = activeProjects[idx];
-                                  return ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color:
-                                            AppTheme.kPrimary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        Icons.science_rounded,
-                                        color: AppTheme.kPrimary,
-                                      ),
-                                    ),
-                                    title: Text(
-                                      p.title,
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      'Target sample: ${p.sampleSize} • ${p.methodology}',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green.shade50,
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            border: Border.all(
-                                                color: Colors.green.shade200),
+                                  return InkWell(
+                                    onTap: () =>
+                                        context.go('/projects/${p.id}'),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                width: 44,
+                                                height: 44,
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.kPrimary
+                                                      .withOpacity(0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.science_rounded,
+                                                  color: AppTheme.kPrimary,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                  child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    p.title,
+                                                    style: GoogleFonts.poppins(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Target sample: ${p.sampleSize} • ${p.methodology}',
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 12,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )),
+                                            ],
                                           ),
-                                          child: Text(
-                                            p.status.name.toUpperCase(),
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.green.shade700,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        IconButton(
-                                          icon: const Icon(
-                                              Icons.arrow_forward_ios_rounded,
-                                              size: 14),
-                                          onPressed: () =>
-                                              context.go('/projects/${p.id}'),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 8),
+                                          Align(
+                                              alignment: Alignment.centerRight,
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          Colors.green.shade50,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      border: Border.all(
+                                                          color: Colors
+                                                              .green.shade200),
+                                                    ),
+                                                    child: Text(
+                                                      p.status.name
+                                                          .toUpperCase(),
+                                                      style:
+                                                          GoogleFonts.poppins(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Colors
+                                                            .green.shade700,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                        Icons
+                                                            .arrow_forward_ios_rounded,
+                                                        size: 14),
+                                                    onPressed: () => context.go(
+                                                        '/projects/${p.id}'),
+                                                  ),
+                                                ],
+                                              )),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 },
@@ -451,7 +497,8 @@ class DashboardScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 const Icon(Icons.bolt_rounded,
                                     color: Colors.amber, size: 28),
@@ -571,67 +618,8 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  static Widget _buildSyncBadge(SyncState state, WidgetRef ref) {
-    Color color;
-    String text;
-    IconData icon;
-
-    switch (state.status) {
-      case SyncStateStatus.syncing:
-        color = const Color(0xFF1565C0);
-        text = 'Syncing...';
-        icon = Icons.sync;
-        break;
-      case SyncStateStatus.offline:
-        color = const Color(0xFFC62828);
-        text = 'Offline Mode';
-        icon = Icons.cloud_off_rounded;
-        break;
-      case SyncStateStatus.error:
-        color = const Color(0xFFF57C00);
-        text = 'Sync Error';
-        icon = Icons.warning_amber_rounded;
-        break;
-      case SyncStateStatus.success:
-      case SyncStateStatus.idle:
-        color = const Color(0xFF2E7D32);
-        text = state.pendingCount > 0
-            ? '${state.pendingCount} Pending'
-            : 'All Synced';
-        icon = Icons.cloud_done_rounded;
-        break;
-    }
-
-    return InkWell(
-      onTap: () => ref.read(syncProvider.notifier).syncAll(),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   static Widget _buildStatCard({
+    bool compact = false,
     required String title,
     required String value,
     required String subtitle,
@@ -644,7 +632,7 @@ class DashboardScreen extends ConsumerWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compact ? 12 : 20),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -663,38 +651,46 @@ class DashboardScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                Expanded(
+                    child: Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: compact ? 11 : 13,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey.shade600,
                   ),
-                ),
+                )),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(compact ? 6 : 8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(colors: bgGradient),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, size: 18, color: accentColor),
+                  child:
+                      Icon(icon, size: compact ? 15 : 18, color: accentColor),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 26,
+                fontSize: compact ? 20 : 26,
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF1E293B),
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: compact ? 2 : 4),
             Text(
               subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 11,
+                fontSize: compact ? 9 : 11,
                 color: Colors.grey.shade500,
               ),
             ),

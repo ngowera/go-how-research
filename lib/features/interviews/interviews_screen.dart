@@ -232,25 +232,6 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
     return result;
   }
 
-  Future<bool> _withinFreeStorage(int incomingBytes) async {
-    final uid = ref.read(currentUserProvider)?.id;
-    if (uid == null) throw StateError('Sign in to store project evidence.');
-    final existing = await Supabase.instance.client
-        .from('project_assets')
-        .select('byte_size')
-        .eq('owner_id', uid)
-        .neq('status', 'uploading');
-    final used = existing.fold<int>(
-        0, (sum, row) => sum + ((row['byte_size'] as num?)?.toInt() ?? 0));
-    const limit = 10 * 1024 * 1024;
-    if (used + incomingBytes > limit) {
-      notice(
-          'Your free 10 MB Data Capture storage is full. Remove unneeded assets or upgrade your storage plan.');
-      return false;
-    }
-    return true;
-  }
-
   Future<void> _uploadAsset({
     required Uint8List bytes,
     required String fileName,
@@ -262,7 +243,6 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
       throw StateError('Select a project before capturing data.');
     }
     if (bytes.isEmpty) throw StateError('The selected file is empty.');
-    if (!await _withinFreeStorage(bytes.length)) return;
     final extension = _extensionFor(fileName);
     final mime = _mimeForExtension(extension);
     if (mime == null) throw StateError('This file type is not supported.');
@@ -421,9 +401,9 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Every item is assigned to the selected project, has a capture timestamp and can include a field note. Free student storage is limited to 10 MB.',
-              style: TextStyle(fontSize: 12),
+            Text(
+              'Every item is assigned to the selected project, has a capture timestamp and can include a field note.',
+              style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -907,7 +887,7 @@ class _InterviewsScreenState extends ConsumerState<InterviewsScreen> {
       canPop: !recording,
       child: Scaffold(
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 130),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
           children: [
             const Text(
               'Data Capture',

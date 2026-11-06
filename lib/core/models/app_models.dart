@@ -695,6 +695,14 @@ class AnalyticsResult {
     this.max,
     required this.count,
     required this.chartData,
+    this.respondentCount = 0,
+    this.answeredCount = 0,
+    this.missingCount = 0,
+    this.q1,
+    this.q3,
+    this.outlierCount = 0,
+    this.rowFrequencies = const {},
+    this.textResponses = const [],
   });
 
   final String questionId;
@@ -708,6 +716,14 @@ class AnalyticsResult {
   final double? max;
   final int count;
   final List<Map<String, dynamic>> chartData;
+  final int respondentCount;
+  final int answeredCount;
+  final int missingCount;
+  final double? q1;
+  final double? q3;
+  final int outlierCount;
+  final Map<String, Map<String, int>> rowFrequencies;
+  final List<String> textResponses;
 
   factory AnalyticsResult.fromJson(Map<String, dynamic> json) =>
       AnalyticsResult(
@@ -728,6 +744,22 @@ class AnalyticsResult {
         chartData: (json['chart_data'] as List<dynamic>? ?? [])
             .map((e) => e as Map<String, dynamic>)
             .toList(),
+        respondentCount: (json['respondent_count'] as num?)?.toInt() ?? 0,
+        answeredCount: (json['answered_count'] as num?)?.toInt() ?? 0,
+        missingCount: (json['missing_count'] as num?)?.toInt() ?? 0,
+        q1: (json['q1'] as num?)?.toDouble(),
+        q3: (json['q3'] as num?)?.toDouble(),
+        outlierCount: (json['outlier_count'] as num?)?.toInt() ?? 0,
+        rowFrequencies:
+            (json['row_frequencies'] as Map<String, dynamic>? ?? {}).map(
+          (row, values) => MapEntry(
+            row,
+            (values as Map<String, dynamic>)
+                .map((value, count) => MapEntry(value, (count as num).toInt())),
+          ),
+        ),
+        textResponses:
+            (json['text_responses'] as List<dynamic>? ?? []).cast<String>(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -742,6 +774,14 @@ class AnalyticsResult {
         'max': max,
         'count': count,
         'chart_data': chartData,
+        'respondent_count': respondentCount,
+        'answered_count': answeredCount,
+        'missing_count': missingCount,
+        'q1': q1,
+        'q3': q3,
+        'outlier_count': outlierCount,
+        'row_frequencies': rowFrequencies,
+        'text_responses': textResponses,
       };
 
   AnalyticsResult copyWith({
@@ -756,6 +796,14 @@ class AnalyticsResult {
     double? max,
     int? count,
     List<Map<String, dynamic>>? chartData,
+    int? respondentCount,
+    int? answeredCount,
+    int? missingCount,
+    double? q1,
+    double? q3,
+    int? outlierCount,
+    Map<String, Map<String, int>>? rowFrequencies,
+    List<String>? textResponses,
   }) =>
       AnalyticsResult(
         questionId: questionId ?? this.questionId,
@@ -769,6 +817,14 @@ class AnalyticsResult {
         max: max ?? this.max,
         count: count ?? this.count,
         chartData: chartData ?? this.chartData,
+        respondentCount: respondentCount ?? this.respondentCount,
+        answeredCount: answeredCount ?? this.answeredCount,
+        missingCount: missingCount ?? this.missingCount,
+        q1: q1 ?? this.q1,
+        q3: q3 ?? this.q3,
+        outlierCount: outlierCount ?? this.outlierCount,
+        rowFrequencies: rowFrequencies ?? this.rowFrequencies,
+        textResponses: textResponses ?? this.textResponses,
       );
 
   @override

@@ -26,6 +26,10 @@ class AppSettings {
   final int accentColor;
   final bool compactLayout;
   final int sidebarColor;
+  final bool darkNavigationBar;
+  final bool darkResearchAssistant;
+  final bool showDescriptiveCompleteness;
+  final bool showAnalyticsInsights;
 
   const AppSettings({
     this.department = 'Faculty of Health Sciences & Technology',
@@ -43,7 +47,11 @@ class AppSettings {
     this.participantIdentityMode = ParticipantIdentityMode.codeOnly,
     this.accentColor = 0xFF1565C0,
     this.compactLayout = false,
-    this.sidebarColor = 0xFFFFFFFF,
+    this.sidebarColor = 0xFF000000,
+    this.darkNavigationBar = false,
+    this.darkResearchAssistant = false,
+    this.showDescriptiveCompleteness = true,
+    this.showAnalyticsInsights = false,
   });
 
   AppSettings copyWith({
@@ -63,11 +71,22 @@ class AppSettings {
     int? accentColor,
     bool? compactLayout,
     int? sidebarColor,
+    bool? darkNavigationBar,
+    bool? darkResearchAssistant,
+    bool? showDescriptiveCompleteness,
+    bool? showAnalyticsInsights,
   }) {
     return AppSettings(
       accentColor: accentColor ?? this.accentColor,
       compactLayout: compactLayout ?? this.compactLayout,
       sidebarColor: sidebarColor ?? this.sidebarColor,
+      darkNavigationBar: darkNavigationBar ?? this.darkNavigationBar,
+      darkResearchAssistant:
+          darkResearchAssistant ?? this.darkResearchAssistant,
+      showDescriptiveCompleteness:
+          showDescriptiveCompleteness ?? this.showDescriptiveCompleteness,
+      showAnalyticsInsights:
+          showAnalyticsInsights ?? this.showAnalyticsInsights,
       department: department ?? this.department,
       orcidId: orcidId ?? this.orcidId,
       degreeProgram: degreeProgram ?? this.degreeProgram,
@@ -100,6 +119,17 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
         accentColor: p.getInt('${_kPrefix}accent') ?? state.accentColor,
         compactLayout: p.getBool('${_kPrefix}compact') ?? false,
         sidebarColor: p.getInt('${_kPrefix}sidebar') ?? state.sidebarColor,
+        darkNavigationBar: p.getBool('${_kPrefix}dark_navigation_bar') ??
+            state.darkNavigationBar,
+        darkResearchAssistant:
+            p.getBool('${_kPrefix}dark_research_assistant') ??
+                state.darkResearchAssistant,
+        showDescriptiveCompleteness:
+            p.getBool('${_kPrefix}show_descriptive_completeness') ??
+                state.showDescriptiveCompleteness,
+        showAnalyticsInsights:
+            p.getBool('${_kPrefix}show_analytics_insights') ??
+                state.showAnalyticsInsights,
         department: p.getString('${_kPrefix}dept') ?? state.department,
         orcidId: p.getString('${_kPrefix}orcid') ?? state.orcidId,
         degreeProgram: p.getString('${_kPrefix}degree') ?? state.degreeProgram,
@@ -154,6 +184,18 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     await p.setInt('${_kPrefix}sidebar', color);
   }
 
+  Future<void> updateNavigationBarStyle({required bool dark}) async {
+    state = state.copyWith(darkNavigationBar: dark);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('${_kPrefix}dark_navigation_bar', dark);
+  }
+
+  Future<void> updateResearchAssistantStyle({required bool dark}) async {
+    state = state.copyWith(darkResearchAssistant: dark);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('${_kPrefix}dark_research_assistant', dark);
+  }
+
   Future<void> updateOrcid(String v) async {
     state = state.copyWith(orcidId: v);
     final p = await SharedPreferences.getInstance();
@@ -200,6 +242,18 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
     state = state.copyWith(decimalPrecision: decimals);
     final p = await SharedPreferences.getInstance();
     await p.setInt('${_kPrefix}decimals', decimals);
+  }
+
+  Future<void> updateShowDescriptiveCompleteness(bool show) async {
+    state = state.copyWith(showDescriptiveCompleteness: show);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('${_kPrefix}show_descriptive_completeness', show);
+  }
+
+  Future<void> updateShowAnalyticsInsights(bool show) async {
+    state = state.copyWith(showAnalyticsInsights: show);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('${_kPrefix}show_analytics_insights', show);
   }
 
   Future<void> updateChartPalette(String palette) async {

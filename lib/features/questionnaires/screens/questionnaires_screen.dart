@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -117,8 +118,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
               TextField(
                 controller: titleCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Questionnaire Title *',
-                  hintText: 'e.g. Student Health Survey',
+                  labelText: 'Enter your questionnaire here',
                 ),
               ),
               const SizedBox(height: 16),
@@ -185,9 +185,9 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: LayoutBuilder(
+      body: PhoneWorkspace(child: LayoutBuilder(
         builder: (context, constraints) {
-          final isPhone = constraints.maxWidth < 600;
+          final isPhone = constraints.maxWidth < 900;
           return Padding(
             padding: EdgeInsets.all(isPhone ? 16 : 28),
             child: Column(
@@ -262,7 +262,8 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                             )
                           : questionnaires.isEmpty
                               ? Center(
-                                  child: Column(
+                                  child: SingleChildScrollView(
+                                      child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(Icons.assignment_outlined,
@@ -292,7 +293,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
                                               'Create Questionnaire'),
                                         ),
                                     ],
-                                  ),
+                                  )),
                                 )
                               : ListView.separated(
                                   itemCount: questionnaires.length,
@@ -533,7 +534,7 @@ class _QuestionnairesScreenState extends ConsumerState<QuestionnairesScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 

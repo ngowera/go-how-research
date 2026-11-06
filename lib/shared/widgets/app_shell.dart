@@ -1,5 +1,6 @@
 // lib/shared/widgets/app_shell.dart
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,11 +15,6 @@ import '../../core/providers/app_settings_provider.dart';
 import '../../core/providers/sync_provider.dart' as sync;
 import '../../core/router/app_router.dart';
 import '../../core/services/project_collaboration_service.dart';
-
-// ---------------------------------------------------------------------------
-// Sync status enum
-// ---------------------------------------------------------------------------
-enum SyncStatus { synced, pending, offline }
 
 // ---------------------------------------------------------------------------
 // Internal data models
@@ -51,31 +47,46 @@ class _NavItem {
 // ---------------------------------------------------------------------------
 // Navigation items definition
 // ---------------------------------------------------------------------------
-const List<_NavItem> _navItems = [
-  _NavItem(
-    label: 'Dashboard',
-    icon: Icons.dashboard_outlined,
-    activeIcon: Icons.dashboard_rounded,
-    route: '/dashboard',
-  ),
-  _NavItem(
-    label: 'Projects',
-    icon: Icons.folder_outlined,
-    activeIcon: Icons.folder_rounded,
-    route: '/projects',
-  ),
-  _NavItem(
-    label: 'Questionnaires & Data',
-    icon: Icons.edit_note_outlined,
-    activeIcon: Icons.edit_note_rounded,
-    route: '/data-collection/default',
-  ),
-  _NavItem(
-    label: 'Analytics',
-    icon: Icons.bar_chart_outlined,
-    activeIcon: Icons.bar_chart_rounded,
-    route: '/analytics/default',
-  ),
+const _dashboardItem = _NavItem(
+  label: 'Home',
+  icon: Icons.home_outlined,
+  activeIcon: Icons.home_rounded,
+  route: '/dashboard',
+);
+const _projectsItem = _NavItem(
+  label: 'Projects',
+  icon: Icons.folder_outlined,
+  activeIcon: Icons.folder_rounded,
+  route: '/projects',
+);
+const _dataItem = _NavItem(
+  label: 'Data',
+  icon: Icons.table_chart_outlined,
+  activeIcon: Icons.table_chart_rounded,
+  route: '/questionnaires',
+);
+const _analyticsItem = _NavItem(
+  label: 'Analytics',
+  icon: Icons.bar_chart_outlined,
+  activeIcon: Icons.bar_chart_rounded,
+  route: '/analytics/default',
+);
+const _settingsItem = _NavItem(
+  label: 'Settings',
+  icon: Icons.settings_outlined,
+  activeIcon: Icons.settings_rounded,
+  route: '/settings',
+);
+
+const List<_NavItem> _primaryNavItems = [
+  _dashboardItem,
+  _projectsItem,
+  _dataItem,
+  _analyticsItem,
+  _settingsItem,
+];
+
+const List<_NavItem> _secondaryNavItems = [
   _NavItem(
     label: 'Participants',
     icon: Icons.people_outline,
@@ -100,12 +111,15 @@ const List<_NavItem> _navItems = [
     activeIcon: Icons.description_rounded,
     route: '/reports',
   ),
-  _NavItem(
-    label: 'Settings',
-    icon: Icons.settings_outlined,
-    activeIcon: Icons.settings_rounded,
-    route: '/settings',
-  ),
+];
+
+const List<_NavItem> _navItems = [
+  _dashboardItem,
+  _projectsItem,
+  _dataItem,
+  _analyticsItem,
+  ..._secondaryNavItems,
+  _settingsItem,
 ];
 
 // ---------------------------------------------------------------------------
@@ -117,25 +131,21 @@ class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
 
   /// Determine the selected index from the current route location.
-  int _selectedIndex(BuildContext context) {
+  int _selectedIndex(BuildContext context, List<_NavItem> items) {
     final loc = GoRouterState.of(context).matchedLocation;
-    if (loc.startsWith('/questionnaires')) {
-      return _navItems.indexWhere(
-        (item) => item.route == '/data-collection/default',
-      );
+    for (int i = 0; i < items.length; i++) {
+      final base = items[i].route.split('/:').first.split('/default').first;
+      if (base.length > 1 && (loc == base || loc.startsWith('$base/'))) {
+        return i;
+      }
     }
-    for (int i = 0; i < _navItems.length; i++) {
-      final base = _navItems[i].route.split('/:').first.split('/default').first;
-      if (loc.startsWith(base) && base.length > 1) return i;
-    }
-    return 0;
+    return -1;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
     final settings = ref.watch(appSettingsProvider);
-    final syncState = ref.watch(sync.syncProvider);
     final displayName = currentUser?.name ?? 'Local Researcher';
     final initials = displayName
         .split(RegExp(r'\s+'))
@@ -148,14 +158,11 @@ class AppShell extends ConsumerWidget {
       role: currentUser?.role.name ?? 'offline',
       initials: initials.isEmpty ? 'LR' : initials,
     );
-    final syncStatus = switch (syncState.status) {
-      sync.SyncStateStatus.success => SyncStatus.synced,
-      sync.SyncStateStatus.offline => SyncStatus.offline,
-      _ => SyncStatus.pending,
-    };
     final screenWidth = MediaQuery.sizeOf(context).width;
     final useRail = screenWidth > 800;
-    final selectedIdx = _selectedIndex(context);
+    final selectedIdx = _selectedIndex(context, _navItems);
+    final selectedPhoneIdx = _selectedIndex(context, _primaryNavItems);
+    final selectedDrawerIdx = _selectedIndex(context, _secondaryNavItems);
 
     if (useRail) {
       return Scaffold(
@@ -167,10 +174,10 @@ class AppShell extends ConsumerWidget {
             // Left sidebar
             // ----------------------------------------------------------------
             _Sidebar(
+              items: _navItems,
               selectedIndex: selectedIdx,
               backgroundColor: Color(settings.sidebarColor),
               user: user,
-              syncStatus: syncStatus,
               onLogout: () async {
                 await ref.read(authStateProvider.notifier).logout();
                 if (context.mounted) context.go(AppRoutes.login);
@@ -204,18 +211,19 @@ class AppShell extends ConsumerWidget {
     }
 
     // ------------------------------------------------------------------------
-    // Narrow screen: use Drawer
+    // Narrow screen: primary destinations stay in a glass bottom bar;
+    // secondary destinations remain available from the drawer.
     // ------------------------------------------------------------------------
     return Scaffold(
-      floatingActionButton: const ResearchAssistantButton(),
       backgroundColor: AppColors.kBackground,
       appBar: AppBar(
+        centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 1,
         leading: Builder(
           builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: AppColors.kPrimary),
+            icon: Icon(Icons.menu_rounded, color: Color(settings.accentColor)),
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
@@ -225,22 +233,159 @@ class AppShell extends ConsumerWidget {
       drawer: Drawer(
         width: 260,
         backgroundColor: Colors.white,
-        child: _Sidebar(
-          selectedIndex: selectedIdx,
-          backgroundColor: Color(settings.sidebarColor),
-          user: user,
-          syncStatus: syncStatus,
-          onLogout: () async {
-            await ref.read(authStateProvider.notifier).logout();
-            if (context.mounted) context.go(AppRoutes.login);
-          },
-          onItemTap: (i) {
-            Navigator.of(context).pop(); // close drawer
-            context.go(_navItems[i].route);
-          },
+        child: SafeArea(
+          child: _Sidebar(
+            items: _secondaryNavItems,
+            selectedIndex: selectedDrawerIdx,
+            backgroundColor: Color(settings.sidebarColor),
+            user: user,
+            onLogout: () async {
+              await ref.read(authStateProvider.notifier).logout();
+              if (context.mounted) context.go(AppRoutes.login);
+            },
+            onItemTap: (i) {
+              Navigator.of(context).pop(); // close drawer
+              context.go(_secondaryNavItems[i].route);
+            },
+          ),
         ),
       ),
-      body: child,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            bottom: MediaQuery.viewInsetsOf(context).bottom == 0 ? 104 : 0,
+            child: SafeArea(top: false, bottom: false, child: child),
+          ),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _PhoneGlassNavigation(
+                items: _primaryNavItems,
+                selectedIndex: selectedPhoneIdx,
+                darkMode: settings.darkNavigationBar,
+                accentColor: Color(settings.accentColor),
+                onItemTap: (i) => context.go(_primaryNavItems[i].route),
+              ),
+            ),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0)
+            const ResearchAssistantButton(phoneOverlay: true),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhoneGlassNavigation extends StatelessWidget {
+  final List<_NavItem> items;
+  final int selectedIndex;
+  final bool darkMode;
+  final Color accentColor;
+  final ValueChanged<int> onItemTap;
+
+  const _PhoneGlassNavigation({
+    required this.items,
+    required this.selectedIndex,
+    required this.darkMode,
+    required this.accentColor,
+    required this.onItemTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkSurface = darkMode;
+    final foreground = isDarkSurface ? Colors.white : const Color(0xFF30343A);
+    final selectedForeground =
+        isDarkSurface ? Colors.white : const Color(0xFF172033);
+    final mutedForeground = foreground.withValues(alpha: 0.82);
+    final surface = isDarkSurface
+        ? const Color(0xFF292929).withValues(alpha: .60)
+        : const Color(0xFFF3F5F7).withValues(alpha: .62);
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(42),
+        child: Container(
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(42),
+            border: Border.all(color: accentColor.withValues(alpha: 0.72)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.20),
+                blurRadius: 18,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(4),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(38),
+                border: Border.all(color: accentColor.withValues(alpha: .36)),
+              ),
+              child: Row(
+                children: List.generate(items.length, (index) {
+                  final item = items[index];
+                  final selected = selectedIndex == index;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 3, vertical: 4),
+                      child: Material(
+                        color: selected
+                            ? accentColor.withValues(
+                                alpha: isDarkSurface ? .82 : .20)
+                            : Colors.transparent,
+                        shape: StadiumBorder(
+                          side: BorderSide(
+                            color: selected
+                                ? accentColor.withValues(alpha: .86)
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: InkWell(
+                          customBorder: const StadiumBorder(),
+                          onTap: () => onItemTap(index),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(selected ? item.activeIcon : item.icon,
+                                    size: 23,
+                                    color: selected
+                                        ? selectedForeground
+                                        : mutedForeground),
+                                const SizedBox(height: 3),
+                                Text(item.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: selected
+                                          ? selectedForeground
+                                          : mutedForeground,
+                                    )),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -313,148 +458,172 @@ class _CollaborationNotificationBellState
   }
 
   void _showNotifications(BuildContext context) {
+    final darkGlass = ref.read(appSettingsProvider).darkResearchAssistant;
+    final glassText = darkGlass ? Colors.white : const Color(0xFF1E293B);
+    final glassMuted =
+        darkGlass ? const Color(0xFFD5DCE8) : const Color(0xFF64748B);
+    final accent = Color(ref.read(appSettingsProvider).accentColor);
     final unreadIds = _notifications
         .where((notice) => notice.isUnread)
         .map((notice) => notice.id)
         .toList(growable: false);
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF321C15),
-      barrierColor: const Color(0xFF2A160F).withValues(alpha: 0.30),
-      showDragHandle: true,
-      builder: (context) => FractionallySizedBox(
-        heightFactor: .82,
-        widthFactor: MediaQuery.sizeOf(context).width < 700 ? 1 : .62,
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: Color(0xFF5B382C),
-                      foregroundColor: Color(0xFFFFF4EA),
-                      child: Icon(Icons.notifications_active_outlined),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                        child: Text(
-                      'Research activity',
-                      style: TextStyle(
-                        color: Color(0xFFFFF4EA),
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    )),
-                    IconButton(
-                      tooltip: 'Close',
-                      onPressed: () => Navigator.pop(context),
-                      color: const Color(0xFFFFF4EA),
-                      icon: const Icon(Icons.close),
-                    )
-                  ],
+      barrierColor: const Color(0xFF201A17).withValues(alpha: 0.48),
+      builder: (context) {
+        final size = MediaQuery.sizeOf(context);
+        final dialogHeight = size.height < 390
+            ? size.height - 48
+            : (size.height * .72).clamp(280, 620);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: (darkGlass ? const Color(0xFF1B2230) : Colors.white)
+                      .withValues(alpha: .70),
+                  border: Border.all(color: accent.withValues(alpha: .45)),
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(left: 52),
-                  child: Text(
-                    'Submissions, collaboration and project updates',
-                    style: TextStyle(color: Color(0xFFE7CFC0), fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (_notifications.isEmpty && _requests.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 28),
-                    child: Center(
-                      child: Text(
-                        'No new research activity yet.',
-                        style: TextStyle(color: Color(0xFFE7CFC0)),
-                      ),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      children: [
-                        ..._notifications.map(
-                          (notice) => Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: notice.isUnread
-                                  ? const Color(0xFF5B382C)
-                                  : const Color(0xFF43271E),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFFE7CFC0)
-                                    .withValues(alpha: 0.20),
+                child: SizedBox(
+                  width: (size.width - 40).clamp(0, 440).toDouble(),
+                  height: dialogHeight.toDouble(),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: accent.withValues(alpha: .18),
+                                foregroundColor: glassText,
+                                child:
+                                    Icon(Icons.notifications_active_outlined),
                               ),
-                            ),
-                            child: ListTile(
-                              leading: Icon(
-                                notice.kind == 'questionnaire_submission'
-                                    ? Icons.assignment_turned_in_outlined
-                                    : Icons.notifications_none_rounded,
-                                color: const Color(0xFFFFD7BE),
-                              ),
-                              title: Text(
-                                notice.title,
-                                style: const TextStyle(
-                                  color: Color(0xFFFFF4EA),
-                                  fontWeight: FontWeight.w700,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                  child: Text(
+                                'Notification center',
+                                style: TextStyle(
+                                  color: glassText,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              )),
+                              IconButton(
+                                tooltip: 'Close',
+                                onPressed: () => Navigator.pop(context),
+                                color: glassText,
+                                icon: const Icon(Icons.close),
+                              )
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          if (_notifications.isEmpty && _requests.isEmpty)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 28),
+                              child: Center(
+                                child: Text(
+                                  'No new research activity yet.',
+                                  style: TextStyle(color: glassMuted),
                                 ),
                               ),
-                              subtitle: Text(
-                                '${notice.body}\n${_relativeTime(notice.createdAt)}',
-                                style: const TextStyle(
-                                  color: Color(0xFFE7CFC0),
+                            )
+                          else
+                            Flexible(
+                              child: ListView(
+                                shrinkWrap: true,
+                                children: [
+                                  ..._notifications.map(
+                                    (notice) => Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: glassText.withValues(
+                                            alpha: notice.isUnread ? .12 : .06),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: accent.withValues(alpha: 0.20),
+                                        ),
+                                      ),
+                                      child: ListTile(
+                                        leading: Icon(
+                                          notice
+                                                      .kind ==
+                                                  'questionnaire_submission'
+                                              ? Icons
+                                                  .assignment_turned_in_outlined
+                                              : Icons
+                                                  .notifications_none_rounded,
+                                          color: accent,
+                                        ),
+                                        title: Text(
+                                          notice.title,
+                                          style: TextStyle(
+                                            color: glassText,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '${notice.body}\n${_relativeTime(notice.createdAt)}',
+                                          style: TextStyle(
+                                            color: glassMuted,
+                                          ),
+                                        ),
+                                        isThreeLine: true,
+                                      ),
+                                    ),
+                                  ),
+                                  ..._requests.map(
+                                    (request) => ListTile(
+                                      leading: Icon(
+                                        Icons.person_add_alt_1_outlined,
+                                        color: accent,
+                                      ),
+                                      title: Text(request.requesterName,
+                                          style: TextStyle(color: glassText)),
+                                      subtitle: Text(
+                                        '${request.projectTitle} • ${request.requestedRole}',
+                                        style: TextStyle(color: glassMuted),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (_requests.isNotEmpty)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  GoRouter.of(context).go('/settings');
+                                },
+                                child: const Text('Manage collaboration'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: accent,
                                 ),
                               ),
-                              isThreeLine: true,
                             ),
-                          ),
-                        ),
-                        ..._requests.map(
-                          (request) => ListTile(
-                            leading: const Icon(
-                              Icons.person_add_alt_1_outlined,
-                              color: Color(0xFFFFD7BE),
-                            ),
-                            title: Text(request.requesterName,
-                                style:
-                                    const TextStyle(color: Color(0xFFFFF4EA))),
-                            subtitle: Text(
-                              '${request.projectTitle} • ${request.requestedRole}',
-                              style: const TextStyle(color: Color(0xFFE7CFC0)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (_requests.isNotEmpty)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        GoRouter.of(context).go('/settings');
-                      },
-                      child: const Text('Manage collaboration'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFFFD7BE),
+                        ],
                       ),
                     ),
                   ),
-              ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
     if (unreadIds.isNotEmpty) {
       _service.markNotificationsRead(unreadIds).catchError((_) {});
@@ -475,7 +644,7 @@ class _CollaborationNotificationBellState
       clipBehavior: Clip.none,
       children: [
         IconButton(
-          tooltip: 'Research activity',
+          tooltip: 'Notification center',
           onPressed: () => _showNotifications(context),
           style: IconButton.styleFrom(
             backgroundColor: const Color(0xFFFFF1E5),
@@ -488,21 +657,12 @@ class _CollaborationNotificationBellState
             top: 3,
             right: 3,
             child: Container(
-              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              alignment: Alignment.center,
+              width: 11,
+              height: 11,
               decoration: BoxDecoration(
-                color: const Color(0xFFB94A2F),
-                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFFE53935),
+                shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: Text(
-                count > 99 ? '99+' : '$count',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
               ),
             ),
           ),
@@ -515,17 +675,17 @@ class _CollaborationNotificationBellState
 // Sidebar widget (shared between rail and drawer)
 // ---------------------------------------------------------------------------
 class _Sidebar extends StatelessWidget {
+  final List<_NavItem> items;
   final int selectedIndex;
   final _UserInfo user;
-  final SyncStatus syncStatus;
   final Color backgroundColor;
   final ValueChanged<int> onItemTap;
   final VoidCallback onLogout;
 
   const _Sidebar({
+    required this.items,
     required this.selectedIndex,
     required this.user,
-    required this.syncStatus,
     required this.backgroundColor,
     required this.onItemTap,
     required this.onLogout,
@@ -549,7 +709,6 @@ class _Sidebar extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(child: _AppLogo()),
-                  _SyncDot(status: syncStatus),
                 ],
               ),
             ),
@@ -562,9 +721,9 @@ class _Sidebar extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                itemCount: _navItems.length,
+                itemCount: items.length,
                 itemBuilder: (context, i) {
-                  final item = _navItems[i];
+                  final item = items[i];
                   final isSelected = i == selectedIndex;
                   return _NavTile(
                     item: item,
@@ -580,7 +739,11 @@ class _Sidebar extends StatelessWidget {
             // User card at bottom
             // ----------------------------------------------------------------
             const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-            _UserCard(user: user, onLogout: onLogout),
+            _UserCard(
+              user: user,
+              onLogout: onLogout,
+              useLightForeground: useLightForeground,
+            ),
           ],
         ),
       ),
@@ -708,78 +871,17 @@ class _AppLogo extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Sync status dot
-// ---------------------------------------------------------------------------
-class _SyncDot extends StatelessWidget {
-  final SyncStatus status;
-  const _SyncDot({required this.status});
-
-  Color get _color {
-    switch (status) {
-      case SyncStatus.synced:
-        return AppColors.kSuccess;
-      case SyncStatus.pending:
-        return AppColors.kWarning;
-      case SyncStatus.offline:
-        return AppColors.kError;
-    }
-  }
-
-  String get _tooltip {
-    switch (status) {
-      case SyncStatus.synced:
-        return 'Synced';
-      case SyncStatus.pending:
-        return 'Sync pending';
-      case SyncStatus.offline:
-        return 'Offline';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: _tooltip,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: _color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _color.withOpacity(0.5),
-                  blurRadius: 4,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            _tooltip,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: _color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // User card (bottom of sidebar)
 // ---------------------------------------------------------------------------
 class _UserCard extends ConsumerWidget {
   final _UserInfo user;
   final VoidCallback onLogout;
-  const _UserCard({required this.user, required this.onLogout});
+  final bool useLightForeground;
+  const _UserCard({
+    required this.user,
+    required this.onLogout,
+    required this.useLightForeground,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -805,7 +907,9 @@ class _UserCard extends ConsumerWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.kOnSurface,
+                    color: useLightForeground
+                        ? Colors.white
+                        : const Color(0xFF1C1B1F),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -813,7 +917,9 @@ class _UserCard extends ConsumerWidget {
                   user.role,
                   style: GoogleFonts.poppins(
                     fontSize: 10,
-                    color: const Color(0xFF6B7280),
+                    color: useLightForeground
+                        ? const Color(0xFFCBD5E1)
+                        : const Color(0xFF6B7280),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -822,10 +928,12 @@ class _UserCard extends ConsumerWidget {
           ),
           // Logout / more options icon
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.logout_rounded,
               size: 18,
-              color: Color(0xFF9CA3AF),
+              color: useLightForeground
+                  ? const Color(0xFFCBD5E1)
+                  : const Color(0xFF64748B),
             ),
             tooltip: 'Sign out',
             onPressed: onLogout,

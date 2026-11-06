@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -46,49 +47,63 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Padding(
-        padding: const EdgeInsets.all(28),
+      body: PhoneWorkspace(
+          child: Padding(
+        padding:
+            EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Research Reports & Dissemination',
-                      style: GoogleFonts.poppins(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Automated executive summaries, methodology synthesis, and publication-ready tables',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
+                SizedBox(
+                    width: MediaQuery.sizeOf(context).width < 600
+                        ? MediaQuery.sizeOf(context).width - 32
+                        : 460,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Research Reports & Dissemination',
+                          style: GoogleFonts.poppins(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Automated executive summaries, methodology synthesis, and publication-ready tables',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    )),
                 if (projects.isNotEmpty)
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      DropdownButton<String>(
-                        value: _selectedProjectId,
-                        items: projects.map((p) {
-                          return DropdownMenuItem(
-                            value: p.id,
-                            child: Text(p.title),
-                          );
-                        }).toList(),
-                        onChanged: (v) =>
-                            setState(() => _selectedProjectId = v),
-                      ),
+                      SizedBox(
+                          width: MediaQuery.sizeOf(context).width < 600
+                              ? MediaQuery.sizeOf(context).width - 32
+                              : 240,
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: _selectedProjectId,
+                            items: projects.map((p) {
+                              return DropdownMenuItem(
+                                value: p.id,
+                                child: Text(p.title),
+                              );
+                            }).toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedProjectId = v),
+                          )),
                       const SizedBox(width: 14),
                       ElevatedButton.icon(
                         onPressed: !canExport
@@ -155,7 +170,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 850),
                         child: Container(
-                          padding: const EdgeInsets.all(40),
+                          padding: EdgeInsets.all(
+                              MediaQuery.sizeOf(context).width < 600 ? 16 : 40),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -177,7 +193,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Column(
+                                    Expanded(
+                                        child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -200,7 +217,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                           ),
                                         ),
                                       ],
-                                    ),
+                                    )),
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
@@ -376,7 +393,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 

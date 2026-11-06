@@ -1,3 +1,4 @@
+import '../../../shared/widgets/phone_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/app_models.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/billing_provider.dart';
 import '../../../core/providers/projects_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'create_project_dialog.dart';
@@ -36,9 +36,9 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: LayoutBuilder(
+      body: PhoneWorkspace(child: LayoutBuilder(
         builder: (context, constraints) {
-          final isPhone = constraints.maxWidth < 600;
+          final isPhone = constraints.maxWidth < 900;
           return Padding(
             padding: EdgeInsets.all(isPhone ? 16 : 28),
             child: Column(
@@ -69,16 +69,25 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                         children: [
                           _buildSearchField(),
                           const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _buildFilterChip(null, 'All'),
-                              _buildFilterChip(ResearchStatus.active, 'Active'),
-                              _buildFilterChip(ResearchStatus.draft, 'Draft'),
-                              _buildFilterChip(
-                                  ResearchStatus.completed, 'Completed'),
-                            ],
+                          SizedBox(
+                            height: 44,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildFilterChip(null, 'All'),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip(
+                                      ResearchStatus.active, 'Active'),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip(
+                                      ResearchStatus.draft, 'Draft'),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip(
+                                      ResearchStatus.completed, 'Completed'),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       )
@@ -117,8 +126,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                                       gridDelegate:
                                           SliverGridDelegateWithFixedCrossAxisCount(
                                         crossAxisCount: columns,
-                                        childAspectRatio:
-                                            columns == 1 ? 2.2 : 1.25,
+                                        mainAxisExtent: 300,
                                         crossAxisSpacing: 18,
                                         mainAxisSpacing: 18,
                                       ),
@@ -134,7 +142,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 
@@ -155,14 +163,6 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
   Widget _buildNewProjectButton() => ElevatedButton.icon(
         onPressed: () {
-          final billing = ref.read(billingProvider);
-          final count = ref.read(projectsProvider).projects.length;
-          if (!billing.hasUnlimitedProjects && count >= 2) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text(
-                    'Free accounts can create up to 2 projects. Upgrade in Settings to continue.')));
-            return;
-          }
           showDialog(
               context: context, builder: (_) => const CreateProjectDialog());
         },
@@ -193,12 +193,15 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     final isSelected = _statusFilter == status;
     return ChoiceChip(
       label: Text(label),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
       selected: isSelected,
       onSelected: (selected) {
         setState(() => _statusFilter = selected ? status : null);
       },
       selectedColor: AppTheme.kPrimary.withValues(alpha: 0.15),
       labelStyle: GoogleFonts.poppins(
+        fontSize: 11,
         color: isSelected ? AppTheme.kPrimary : Colors.grey.shade700,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
       ),

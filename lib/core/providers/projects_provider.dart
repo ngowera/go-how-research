@@ -1,10 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../database/app_database.dart' show AppDatabase, databaseProvider;
 import '../models/app_models.dart';
 import 'auth_provider.dart';
-import 'billing_provider.dart';
 import 'sync_provider.dart';
 
 class ProjectsState {
@@ -35,24 +36,38 @@ class ProjectsNotifier extends StateNotifier<ProjectsState> {
   final AppDatabase _db;
   final Ref _ref;
   static const _uuid = Uuid();
+  bool _hasLoaded = false;
 
   ProjectsNotifier(this._db, this._ref) : super(const ProjectsState()) {
     loadProjects();
     _ref.listen<DateTime?>(
-      syncProvider.select((sync) => sync.lastAttemptTime),
+      syncProvider.select((sync) => sync.lastSyncTime),
       (previous, next) {
-        if (next != null && next != previous) loadProjects();
+        if (next != null && next != previous) loadProjects(silent: true);
       },
     );
   }
 
-  Future<void> loadProjects() async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> loadProjects({bool silent = false}) async {
+    if (!silent || !_hasLoaded) {
+      state = state.copyWith(isLoading: true, error: null);
+    }
     try {
       final list = await _db.getProjects();
+      _hasLoaded = true;
+      final sameData = list.length == state.projects.length &&
+          jsonEncode(list.map((item) => item.toJson()).toList()) ==
+              jsonEncode(state.projects.map((item) => item.toJson()).toList());
+      if (sameData) {
+        if (state.isLoading) state = state.copyWith(isLoading: false);
+        return;
+      }
       state = state.copyWith(projects: list, isLoading: false);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: _hasLoaded ? null : e.toString(),
+      );
     }
   }
 
@@ -72,11 +87,6 @@ class ProjectsNotifier extends StateNotifier<ProjectsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final currentUser = _ref.read(currentUserProvider);
-      final billing = _ref.read(billingProvider);
-      if (!billing.hasUnlimitedProjects && state.projects.length >= 2) {
-        throw StateError(
-            'The Free plan supports up to 2 projects. Upgrade in Settings to create more.');
-      }
       final now = DateTime.now();
       final project = ResearchProject(
         id: _uuid.v4(),
@@ -140,13 +150,6 @@ class ProjectsNotifier extends StateNotifier<ProjectsState> {
   }
 
   Future<void> duplicateProject(String id) async {
-    final billing = _ref.read(billingProvider);
-    if (!billing.hasUnlimitedProjects && state.projects.length >= 2) {
-      state = state.copyWith(
-          error:
-              'The Free plan supports up to 2 projects. Upgrade in Settings to duplicate more.');
-      return;
-    }
     final proj = await _db.getProjectById(id);
     if (proj != null) {
       final now = DateTime.now();

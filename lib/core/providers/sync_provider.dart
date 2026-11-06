@@ -96,6 +96,81 @@ class SyncNotifier extends StateNotifier<SyncState> {
     } catch (_) {}
   }
 
+  /// Pushes only the selected instrument before public-link publishing, so an
+  /// unrelated pending edit to a shared project cannot block the owner.
+  Future<bool> syncQuestionnaireForPublishing(String questionnaireId) async {
+    if (state.status == SyncStateStatus.syncing) {
+      state = state.copyWith(
+        message: 'A sync is already running. Try publishing again shortly.',
+      );
+      return false;
+    }
+    final url = dotenv.env['SUPABASE_URL'] ?? '';
+    final key = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    final configured =
+        Uri.tryParse(url)?.host.endsWith('.supabase.co') == true &&
+            key.isNotEmpty &&
+            !key.contains('your-anon-key');
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (!configured || user == null) {
+      state = state.copyWith(
+        status: SyncStateStatus.error,
+        message: 'Sign in online and configure cloud sync before publishing.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(
+      status: SyncStateStatus.syncing,
+      message: 'Preparing questionnaire for publishing...',
+    );
+    try {
+      final questionnaire = await _db.getQuestionnaireById(questionnaireId);
+      if (questionnaire == null) {
+        throw StateError('This questionnaire is not available on this device.');
+      }
+      final project = await _db.getProjectById(questionnaire.projectId);
+      if (project == null || project.ownerId != user.id) {
+        throw StateError(
+            'Only the project owner can publish its questionnaire.');
+      }
+      final questions =
+          await _db.getQuestions(questionnaireId: questionnaireId);
+      if (questions.isEmpty) {
+        throw StateError('Add at least one question before publishing.');
+      }
+      await _db.normalizeQuestionOrder(questionnaireId);
+      final normalizedQuestions =
+          await _db.getQuestions(questionnaireId: questionnaireId);
+
+      await supabase.from('projects').upsert(project.toJson());
+      await supabase.from('questionnaires').upsert(questionnaire.toJson());
+      if (normalizedQuestions.isNotEmpty) {
+        await supabase.from('questions').upsert(
+              normalizedQuestions.map((question) => question.toJson()).toList(),
+            );
+      }
+      await _db.markProjectSynced(project.id);
+      await _db.markQuestionnaireSynced(questionnaireId);
+      await refreshPendingCount();
+      state = state.copyWith(
+        status: SyncStateStatus.success,
+        message: 'Questionnaire is ready to publish.',
+        lastSyncTime: DateTime.now(),
+        lastAttemptTime: DateTime.now(),
+      );
+      return true;
+    } catch (error) {
+      state = state.copyWith(
+        status: SyncStateStatus.error,
+        message: _safeSyncError(error),
+        lastAttemptTime: DateTime.now(),
+      );
+      return false;
+    }
+  }
+
   Future<void> syncAll() async {
     if (state.status == SyncStateStatus.syncing) return;
     final url = dotenv.env['SUPABASE_URL'] ?? '';

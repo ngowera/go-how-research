@@ -21,7 +21,9 @@ Future<void> main() async {
   }
 
   // Initialize window manager for desktop
-  if (!kIsWeb) {
+  if (!kIsWeb &&
+      {TargetPlatform.linux, TargetPlatform.macOS, TargetPlatform.windows}
+          .contains(defaultTargetPlatform)) {
     try {
       await windowManager.ensureInitialized();
       WindowOptions windowOptions = const WindowOptions(
