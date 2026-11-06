@@ -19,8 +19,13 @@ can answer, but cannot read responses.
 4. In Namecheap DNS, point the `www` CNAME to `ngowera.github.io`.
    Check existing DNS records before replacing them. Once GitHub validates the
    domain, enable HTTPS. Verify domain ownership in GitHub's Pages settings.
-5. Add `https://www.afrisoft.space` to the Supabase Auth site/redirect configuration
-   if this is the primary sign-in site. Retain any other required app redirects.
+5. In Supabase Authentication → URL Configuration, set the Site URL to
+   `https://afrisoft.space` and add `https://afrisoft.space/**` and
+   `https://www.afrisoft.space/**` to the Redirect URLs list. Keep any local
+   development URLs you need. The Pages build explicitly sends Google sign-in
+   back to `https://afrisoft.space`; Supabase must allow that redirect.
+   In Google Cloud's OAuth client, the authorized redirect URI is the Supabase
+   callback (`https://<project-ref>.supabase.co/auth/v1/callback`), not localhost.
 6. Open the site, sign in, and choose Questionnaires → **Collect / Share**. Use
    **Answer on this device** for local/offline collection. To accept browser
    responses, set the unique link name, study information, participant details,

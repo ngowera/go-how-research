@@ -23,6 +23,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          WEB_AUTH_REDIRECT_URL: https://afrisoft.space
         run: python3 tool/prepare_pages.py --configure
       - run: flutter pub get
       - run: flutter test
